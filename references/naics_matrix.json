@@ -1,0 +1,17 @@
+{
+  "236220": {
+    "sector": "Commercial and Institutional Building Construction",
+    "core_bottleneck": "Estimators wasting manual hours parsing massive municipal code books and multi-hundred page RFP bid packages.",
+    "on_prem_solution": "An offline, local-first RAG Document Auditor loaded with custom regional zoning codes to extract line-item material specs from blueprints in 10 minutes."
+  },
+  "561720": {
+    "sector": "Janitorial Services",
+    "core_bottleneck": "High-volume operational friction dispatching multi-lingual crews and tracking strict QA logs for commercial government facilities.",
+    "on_prem_solution": "A secure, locally hosted multi-language audio translation server that converts federal work orders into field crew voice notes with zero cloud latency."
+  },
+  "333415": {
+    "sector": "HVAC and Commercial Refrigeration Equipment Manufacturing",
+    "core_bottleneck": "Junior field technicians losing hours looking up technical schematics or repair manuals for heavy industrial chillers on-site.",
+    "on_prem_solution": "An isolated, tablet-native local LLM engine acting as an Equipment Diagnostic Oracle, allowing engineers to look up engineering faults offline."
+  }
+}
