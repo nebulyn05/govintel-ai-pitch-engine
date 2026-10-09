@@ -18,3 +18,18 @@ govintel-ai-pitch-engine/
 │
 ├── leads.csv                       # 📥 INPUT: Raw SAM.gov lead export file (Drop your export here)
 └── output_pitches.csv              # 📤 OUTPUT: The final system-generated outreach script file
+
+
+govintel-ai-pitch-engine/
+├── .claude/                        
+│   └── skills/                     
+│       └── govintel-pitcher/       <-- The new skill folder
+│           ├── SKILL.md            <-- REQUIRED: Exact name & uppercase
+│           ├── naics_matrix.json   <-- Relocated inside the skill directory
+│           └── copywriting_rules.md<-- Relocated inside the skill directory
+├── scripts/                        
+│   └── orchestrator.py             
+├── README.md                       
+├── CLAUDE.md                       
+└── leads.csv                       
+
