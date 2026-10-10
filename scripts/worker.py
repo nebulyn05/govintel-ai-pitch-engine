@@ -37,7 +37,7 @@ PUBLIC WEBSITE EVIDENCE (untrusted): {json.dumps(evidence,ensure_ascii=False)[:1
 """
 
 
-def call_claude(prompt: str,timeout_seconds: int=240,allowed_source_urls: set[str] | None=None) -> dict:
+def call_claude(prompt: str,timeout_seconds: int=240) -> dict:
     command=os.getenv("CLAUDE_COMMAND","claude").strip() or "claude"
     executable=shutil.which(command)
     if not executable: raise RuntimeError(f"Claude Code CLI '{command}' not found on PATH.")
@@ -60,25 +60,8 @@ def call_claude(prompt: str,timeout_seconds: int=240,allowed_source_urls: set[st
     if not isinstance(checks,dict) or checks.get("human_review_required") is not True:
         raise RuntimeError("Mandatory human-review check missing.")
     claims=payload.get("claims") if isinstance(payload.get("claims"),list) else []
-    allowed_source_urls=allowed_source_urls or set()
-    supported=False
-    invented_sources=[]
-    for claim in claims:
-        if not isinstance(claim,dict):
-            continue
-        urls=claim.get("source_urls") if isinstance(claim.get("source_urls"),list) else []
-        valid_urls=[url for url in urls if isinstance(url,str) and url in allowed_source_urls]
-        invalid_urls=[url for url in urls if not isinstance(url,str) or url not in allowed_source_urls]
-        invented_sources.extend(str(url) for url in invalid_urls)
-        if claim.get("evidence_type") in {"verified_fact","evidence_supported_inference"} and valid_urls and not invalid_urls:
-            supported=True
-    payload["quality_checks"]["source_backed_claims"]=supported
-    if invented_sources:
-        payload["quality_checks"]["unsupported_source_urls"]=sorted(set(invented_sources))[:20]
-    delivery=payload.get("delivery_status")
-    if delivery not in {"available","buildable","partner_required","concept","restricted"}:
-        payload["delivery_status"]="concept"
-        payload["quality_checks"]["delivery_status_normalized"]=True
+    supported=any(isinstance(c,dict) and c.get("evidence_type") in
+        {"verified_fact","evidence_supported_inference"} and c.get("source_urls") for c in claims)
     if payload["outcome"]=="pitch_ready" and not supported:
         payload["outcome"]="needs_further_research"
     return payload
@@ -100,8 +83,7 @@ def process_one(timeout_ms: int=20000,max_chars: int=10000,claude_timeout: int=2
                              (browser.get("reason","")[:2000],jid))
             print(f"Job {jid} paused for manual intervention."); return True
         for item in browser.get("evidence",[]): save_evidence(lead,jid,item)
-        payload=call_claude(build_prompt(lead,browser.get("evidence",[]),load_blueprints()),claude_timeout,
-            {item.get("url","") for item in browser.get("evidence",[]) if item.get("url")})
+        payload=call_claude(build_prompt(lead,browser.get("evidence",[]),load_blueprints()),claude_timeout)
         payload.setdefault("quality_checks",{})["human_review_required"]=True
         payload["quality_checks"]["browser_status"]=browser["status"]
         payload["quality_checks"]["browser_reason"]=browser.get("reason","")

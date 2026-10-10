@@ -30,7 +30,8 @@ def init_db() -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     # Execute one DDL statement at a time for compatibility with PostgreSQL drivers.
     with connect() as conn:
-        for statement in schema.split(";"):
+        # Split only on statement-terminating semicolons, not punctuation in SQL comments or literals.
+        for statement in re.split(r";\\s*(?=\\n|$)", schema):
             if statement.strip():
                 conn.execute(statement)
 
