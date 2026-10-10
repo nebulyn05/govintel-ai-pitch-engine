@@ -27,8 +27,12 @@ def connect():
 
 
 def init_db() -> None:
+    schema = SCHEMA_PATH.read_text(encoding="utf-8")
+    # Execute one DDL statement at a time for compatibility with PostgreSQL drivers.
     with connect() as conn:
-        conn.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
+        for statement in schema.split(";"):
+            if statement.strip():
+                conn.execute(statement)
 
 
 def normalize_name(value: str) -> str:
