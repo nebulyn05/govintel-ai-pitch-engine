@@ -31,7 +31,7 @@ def init_db() -> None:
     # Execute one DDL statement at a time for compatibility with PostgreSQL drivers.
     with connect() as conn:
         # Split only on statement-terminating semicolons, not punctuation in SQL comments or literals.
-        for statement in re.split(r";\\s*(?=\\n|$)", schema):
+        for statement in re.split(r";\s*(?=\n|$)", schema):
             if statement.strip():
                 conn.execute(statement)
 
