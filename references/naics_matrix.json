@@ -1,17 +1,26 @@
 {
+  "default": {
+    "sector": "Unknown / mixed sector",
+    "core_bottleneck": "No NAICS-specific pattern has been validated for this lead.",
+    "on_prem_solution": "Research company-specific public evidence first; do not infer a pain point from NAICS alone.",
+    "delivery_status": "concept"
+  },
   "236220": {
     "sector": "Commercial and Institutional Building Construction",
-    "core_bottleneck": "Estimators wasting manual hours parsing massive municipal code books and multi-hundred page RFP bid packages.",
-    "on_prem_solution": "An offline, local-first RAG Document Auditor loaded with custom regional zoning codes to extract line-item material specs from blueprints in 10 minutes."
+    "core_bottleneck": "Estimators may spend time reviewing long bid packages, drawings, specifications, and local code requirements.",
+    "on_prem_solution": "A locally deployed document retrieval and review assistant that cites source pages and flags extracted requirements for estimator verification.",
+    "delivery_status": "buildable"
   },
   "561720": {
     "sector": "Janitorial Services",
-    "core_bottleneck": "High-volume operational friction dispatching multi-lingual crews and tracking strict QA logs for commercial government facilities.",
-    "on_prem_solution": "A secure, locally hosted multi-language audio translation server that converts federal work orders into field crew voice notes with zero cloud latency."
+    "core_bottleneck": "Multi-site service teams may face friction coordinating work orders, language needs, and quality-assurance records.",
+    "on_prem_solution": "A locally hosted work-order and multilingual field-assistance workflow, subject to discovery and integration assessment.",
+    "delivery_status": "buildable"
   },
   "333415": {
     "sector": "HVAC and Commercial Refrigeration Equipment Manufacturing",
-    "core_bottleneck": "Junior field technicians losing hours looking up technical schematics or repair manuals for heavy industrial chillers on-site.",
-    "on_prem_solution": "An isolated, tablet-native local LLM engine acting as an Equipment Diagnostic Oracle, allowing engineers to look up engineering faults offline."
+    "core_bottleneck": "Technicians may need to search equipment manuals, service bulletins, and diagnostic procedures while working in the field.",
+    "on_prem_solution": "A local document search assistant over approved service manuals, with citations and technician verification.",
+    "delivery_status": "buildable"
   }
 }

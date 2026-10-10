@@ -1,4 +1,31 @@
-__pycache__/
-*.pyc
+# Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Lead data and generated artifacts
+leads.csv
 output_pitches.csv
+data/
+workspaces/
+downloads/
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Browser artifacts and editors
+playwright-report/
+test-results/
+.DS_Store
+.vscode/
+.idea/
