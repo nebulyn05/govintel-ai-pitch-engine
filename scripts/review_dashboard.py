@@ -238,7 +238,7 @@ def main():
     parser.add_argument("--host",default="127.0.0.1")
     parser.add_argument("--port",type=int,default=8765)
     args=parser.parse_args()
-    if args.host not in {"127.0.0.1","localhost","::1"}:
+    if args.host not in {"127.0.0.1","localhost"}:
         parser.error("Dashboard must bind to loopback only.")
     if not 1024 <= args.port <= 65535:
         parser.error("--port must be between 1024 and 65535.")
