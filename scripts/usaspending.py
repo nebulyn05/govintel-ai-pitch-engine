@@ -154,16 +154,29 @@ def lookup_award_history(
         if city_ok and state_ok and has_location_corroboration:
             corroborated.append(row)
 
-    if len(corroborated) == 1:
-        row = corroborated[0]
+    # Multiple awards can belong to the same recipient. Group by recipient identity
+    # before deciding whether the lead matches one entity or several.
+    recipient_groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in corroborated:
+        city, state = _location_parts(row.get("Recipient Location"))
+        key = (
+            normalize_uei(str(row.get("Recipient UEI") or "")),
+            normalize_legal_name(str(row.get("Recipient Name") or "")),
+            f"{city}|{state}",
+        )
+        recipient_groups.setdefault(key, []).append(row)
+
+    if len(recipient_groups) == 1:
+        matched_rows = next(iter(recipient_groups.values()))
+        row = matched_rows[0]
         recipient = {"name": row.get("Recipient Name"), "uei": row.get("Recipient UEI"),
                      "location": row.get("Recipient Location")}
         return LookupResult("matched", "exact_legal_name_and_location", 0.90,
-                            recipient, corroborated, query,
+                            recipient, matched_rows, query,
                             "Exact normalized legal name plus location corroboration.")
-    if len(corroborated) > 1:
+    if len(recipient_groups) > 1:
         return LookupResult("ambiguous", "exact_legal_name_and_location", 0.0, None, [],
-                            query, "Multiple recipient records share the supplied identity.")
+                            query, "Multiple distinct recipient identities share the supplied name and location.")
     return LookupResult("identity_unconfirmed", "legal_name_only", 0.0, None, [],
                         query, "Name-only results are not attached to this lead; provide UEI or corroborating location.")
 
@@ -177,7 +190,6 @@ def award_evidence_items(result: LookupResult) -> list[dict[str, Any]]:
         award_id = str(award.get("Award ID") or "").strip()
         if not award_id:
             continue
-        recipient = result.recipient or {}
         url = f"https://www.usaspending.gov/award/{quote(award_id, safe='')}"
         details = {
             "source": "USAspending.gov",
