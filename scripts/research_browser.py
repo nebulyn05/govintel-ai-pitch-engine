@@ -5,6 +5,7 @@ import ipaddress
 import re
 import socket
 from collections import Counter
+from datetime import datetime
 from urllib.parse import urljoin, urlparse, urldefrag, urlunparse
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -83,13 +84,12 @@ def extract_site_signals(html: str, text: str) -> dict:
         if any(re.search(pattern, source) for pattern in patterns)
     )
     years = [int(value) for value in re.findall(r"(?:©|copyright|copyright\s*©?)\s*(20\d{2})", text or "", re.I)]
-    current_year = __import__("datetime").datetime.now().year
     words = re.findall(r"\b[\w'-]+\b", text or "")
     meaningful = [word for word in words if len(word.strip("'-")) > 2]
     return {
         "technology_signals": technologies,
         "copyright_years": sorted(set(years)),
-        "copyright_appears_old": bool(years and max(years) < current_year - 2),
+        "copyright_appears_old": bool(years and max(years) < datetime.now().year - 2),
         "meaningful_word_count": len(meaningful),
         "content_thin_signal": len(meaningful) < 150,
         "signal_caveat": "Technical and content signals are observations only; they do not establish business need, viability, or a reason to reject a lead.",
@@ -134,7 +134,7 @@ def research_website(
     aggregate = Counter()
     signal_records = []
     failures = []
-    origin_host = urlparse(target).hostname or ""
+    attempted = 0
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
@@ -154,8 +154,7 @@ def research_website(
             queue = [target]
             try:
                 while queue and attempted < max_pages:
-                    current = queue.pop(0)
-                    current = urldefrag(current)[0]
+                    current = urldefrag(queue.pop(0))[0]
                     if current in seen:
                         continue
                     seen.add(current)
@@ -183,28 +182,28 @@ def research_website(
                         signal_records.append({"url": final_url, **signals})
                         for technology in signals["technology_signals"]:
                             aggregate[technology] += 1
-                        excerpt = body[:max_chars]
-                        if excerpt:
+                        if body:
                             evidence.append({
-                                "url": final_url, "title": title, "excerpt": excerpt,
+                                "url": final_url, "title": title, "excerpt": body[:max_chars],
                                 "metadata": {
                                     "http_status": response.status if response is not None else None,
                                     "retrieval_method": "playwright_adaptive_same_site",
                                     "page_type": page_kind, "site_signals": signals,
                                 },
                             })
-                        if len(evidence) == 1:
+                        if len(seen) == 1:
                             for anchor in page.locator("a[href]").evaluate_all(
                                 "(els) => els.map(a => ({href:a.href,label:(a.innerText||a.getAttribute('aria-label')||'').trim()}))"
                             ):
                                 href = anchor.get("href", "")
-                                if not href or not _same_site(href, target):
-                                    continue
-                                score, kind = _link_score(href, anchor.get("label", ""), industry_hint)
-                                if score:
-                                    candidates[urldefrag(href)[0]] = (score, kind)
+                                if href and _same_site(href, target):
+                                    score, _kind = _link_score(href, anchor.get("label", ""), industry_hint)
+                                    if score:
+                                        candidates[urldefrag(href)[0]] = (score, _kind)
+                            parsed_origin = urlparse(target)
+                            site_root = urlunparse((parsed_origin.scheme, parsed_origin.netloc, "/", "", "", ""))
                             for path, kind in FALLBACK_PATHS:
-                                parsed_origin = urlparse(target)\n                                site_root = urlunparse((parsed_origin.scheme, parsed_origin.netloc, "/", "", "", ""))\n                                fallback = urljoin(site_root, path.lstrip("/"))
+                                fallback = urljoin(site_root, path.lstrip("/"))
                                 candidates.setdefault(fallback, (1, kind))
                             ordered = sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))
                             queue.extend(candidate for candidate, _ in ordered[:12] if candidate not in seen)
@@ -218,7 +217,8 @@ def research_website(
                     "reason": "; ".join(failures[:5]),
                     "evidence": evidence,
                     "signals": {
-                        "pages_visited": len(evidence),\n                        "page_attempts": attempted,
+                        "pages_visited": len(evidence),
+                        "page_attempts": attempted,
                         "technology_signals": sorted(aggregate),
                         "page_signals": signal_records,
                         "signals_are_not_pain_points": True,
