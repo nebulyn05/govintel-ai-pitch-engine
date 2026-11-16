@@ -96,3 +96,26 @@ CREATE TABLE IF NOT EXISTS solution_registry (
  status TEXT NOT NULL DEFAULT 'candidate', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  UNIQUE(solution_key,version)
 );
+
+-- Batch 4: structured opportunity scoring and controlled solution approval.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS impact TEXT NOT NULL DEFAULT 'low';
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS urgency TEXT NOT NULL DEFAULT 'low';
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS evidence_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS impact_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS urgency_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS feasibility_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS priority_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS evidence_claim_indices JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS capability_tags JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS buyer_role TEXT NOT NULL DEFAULT '';
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'needs_review';
+CREATE INDEX IF NOT EXISTS opportunities_priority_idx ON opportunities(lead_id,priority_score DESC,created_at DESC);
+
+ALTER TABLE solution_candidates ADD COLUMN IF NOT EXISTS solution_registry_id BIGINT REFERENCES solution_registry(id) ON DELETE RESTRICT;
+ALTER TABLE solution_candidates ADD COLUMN IF NOT EXISTS match_score NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE solution_candidates ADD COLUMN IF NOT EXISTS match_metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE solution_candidates ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'candidate';
+
+ALTER TABLE solution_registry ADD COLUMN IF NOT EXISTS reviewed_by TEXT NOT NULL DEFAULT '';
+ALTER TABLE solution_registry ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS solution_registry_status_idx ON solution_registry(status,solution_key);
