@@ -223,7 +223,7 @@ def get_approved_solutions() -> list[dict]:
         return conn.execute(
             """SELECT id,solution_key,version,title,description,delivery_status,
                       approved_claims,requirements,status
-               FROM solution_registry WHERE status='approved'
+               FROM solution_registry WHERE status='approved' AND delivery_status IN ('available','buildable','partner_required')
                ORDER BY solution_key,version DESC"""
         ).fetchall()
 
