@@ -197,6 +197,8 @@ class Handler(BaseHTTPRequestHandler):
             opp_html = "".join(f'<article><b>{esc(o["title"])}</b> — {esc(o["priority_score"])}/100'
                 f'<p>{esc(o["evidence_type"])} · impact {esc(o["impact"])} · urgency {esc(o["urgency"])}</p>'
                 f'<p>{esc(o["description"])}</p><p>Evidence claim indices: {esc(o["evidence_claim_indices"])}</p>'
+                f'<p>Scoring version: {esc(o.get("scoring_version","legacy"))}</p>'
+                f'<p>Evidence quality components:</p><pre>{esc(o.get("evidence_quality",{}))}</pre>'
                 f'<pre>{esc(o["matches"])}</pre></article>' for o in opps)
             body = f"""<h1>{esc(draft["company_name"])}</h1>
 <p>{esc(draft["website"])} · NAICS {esc(draft["naics_code"])} · {esc(draft["city"])} {esc(draft["state"])}</p>
