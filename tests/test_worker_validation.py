@@ -45,6 +45,7 @@ def test_unverified_source_downgrades_pitch_ready():
     payload = validate_payload(valid_payload(), {"https://example.com"}, approved_registry())
     assert payload["outcome"] == "needs_further_research"
     assert payload["quality_checks"]["unsupported_source_urls"] == ["https://example.com/capabilities"]
+    assert payload["claims"][0]["source_urls"] == []
 
 
 def test_industry_hypothesis_cannot_make_pitch_ready():
