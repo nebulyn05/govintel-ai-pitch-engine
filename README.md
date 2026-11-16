@@ -70,7 +70,7 @@ You can enqueue 1,000 leads, but do not launch 1,000 processes. The initial work
 
 ## Opportunity discovery and solution registry
 
-The research worker converts Claude's structured opportunity hypotheses into deterministic, explainable priority scores. Each opportunity must reference claim indices from the lead's evidence. Scoring separates evidence strength, estimated impact, urgency and approved-solution feasibility; industry-only hypotheses are capped and routed for more research. These scores support triage and do not automatically authorize outreach.
+The research worker converts Claude's structured opportunity hypotheses into deterministic, explainable priority scores. Each opportunity must reference claim indices from the lead's evidence. Scoring uses 40% evidence strength, 20% estimated impact, 20% estimated urgency and 20% approved-solution feasibility. If there is no company-specific source-backed claim, the priority score is capped at 35/100 and routed for more evidence. Impact and urgency are model estimates, not verified facts; the score is a triage aid, never an automatic contact decision.
 
 The solution registry starts with candidate templates in `references/solution_registry.json`. Candidate entries are not offerings and are never recommended as approved solutions. Review and edit their delivery status, prerequisites, capability tags and explicit approved claims before approving one:
 
