@@ -67,7 +67,7 @@ def match_approved_solutions(
         industry_match = (
             not supported_naics and not supported_sectors
             or naics_code.casefold() in supported_naics
-            or sector.casefold() in supported_sectors
+            or bool(_tags([sector]) & supported_sectors)
         )
         tag_score = len(overlap) / max(1, len(wanted)) * 70
         score = min(100.0, tag_score + (30 if industry_match else 0))
