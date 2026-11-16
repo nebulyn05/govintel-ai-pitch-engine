@@ -34,7 +34,7 @@ Do not browse or invoke tools. Use only supplied evidence and the approved regis
 Never invent company facts, awards, contract requirements, compliance status, systems, losses, ROI, pain points, or personal facts.
 Classify claims as verified_fact, evidence_supported_inference, or industry_hypothesis. A NAICS pattern alone is an industry_hypothesis.
 If company-specific evidence is weak, choose needs_further_research. No credible fit means do_not_pursue.
-A proposed solution MUST be selected from the human-approved registry below. Never invent a solution, delivery capability, integration, price, ROI or performance claim.
+A proposed solution MUST be selected from the human-approved registry below. Use only its approved_claims for statements about the solution. Never invent a solution, delivery capability, integration, price, ROI or performance claim.
 Technology stack, copyright dates, page length, and CMS signals are observations only. They are NOT proof of pain, poor quality, budget or buying intent.
 Award history is context only, never proof of a current pain point, budget or buying intent.
 No outreach is sent. Human review is mandatory. Avoid: {", ".join(BANNED)}.
@@ -256,7 +256,6 @@ def process_one(
         payload["quality_checks"]["usaspending_status"] = award_history.get("status", "unknown")
         payload["quality_checks"]["usaspending_match_method"] = award_history.get("match_method", "none")
         payload["quality_checks"]["usaspending_award_count"] = len(award_history.get("awards", []))
-        save_pitch(lead, jid, payload)
         save_pitch(lead, jid, payload)
         print(f"Job {jid}: {payload['outcome']} (lead {lead['id']}; pages {len(browser.get('evidence', []))})")
         return True
