@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from scripts.db import enqueue_lead, export_pitches, init_db, job_counts
+from scripts.db import (enqueue_lead, export_pitches, init_db, job_counts,\n                        sync_solution_registry, list_solution_registry, approve_solution, reject_solution)
 
 ROOT=Path(__file__).resolve().parents[1]
 
