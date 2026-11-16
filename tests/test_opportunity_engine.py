@@ -93,3 +93,11 @@ def test_hypothesis_without_a_source_is_capped_even_with_high_estimated_impact()
     )
     assert result[0]["priority_score"] <= 35
     assert result[0]["company_specific_evidence"] is False
+
+
+
+def test_solution_is_not_matched_outside_its_supported_industry():
+    solution = approved_solution()
+    assert not match_approved_solutions(
+        {"capability_tags": ["document_search"]}, "541512", "Computer Systems Design Services", [solution]
+    )
