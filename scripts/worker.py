@@ -99,8 +99,10 @@ def validate_payload(
         if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
             raise RuntimeError(f"Claim at index {index} confidence must be between 0 and 1.")
         invalid = [url for url in urls if url not in allowed_source_urls]
+        valid_urls = [url for url in urls if url in allowed_source_urls]
         unsupported_urls.extend(invalid)
-        if claim["evidence_type"] in {"verified_fact", "evidence_supported_inference"} and urls and not invalid:
+        claim["source_urls"] = valid_urls
+        if claim["evidence_type"] in {"verified_fact", "evidence_supported_inference"} and valid_urls:
             supported = True
     opportunities = payload.get("opportunities")
     if not isinstance(opportunities, list) or len(opportunities) > 10:
