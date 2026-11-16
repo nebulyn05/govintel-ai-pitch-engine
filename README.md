@@ -2,7 +2,7 @@
 
 Local-first research and pitch preparation for US businesses and government contractors. The DBS framework separates **Direction** (objectives and guardrails), **Blueprints** (research plans), and **Solutions** (evidence-backed findings and draft pitches).
 
-> This first runtime slice provides PostgreSQL job persistence, CSV intake, bounded one-page Playwright research, and a supervised Claude Code CLI synthesis stage. It is not yet the complete multi-source GovCon intelligence product. It does not send outreach.
+> This first runtime slice provides PostgreSQL job persistence, CSV intake, bounded adaptive same-site Playwright research, and a supervised Claude Code CLI synthesis stage. It is not yet the complete multi-source GovCon intelligence product. It does not send outreach.
 
 ## Safety and evidence rules
 
@@ -52,6 +52,9 @@ python -m scripts.orchestrator status
 # Process at most one job:
 python -m scripts.worker --once
 
+# Optional research budget (default 3 pages, maximum 5):
+# python -m scripts.worker --once --browser-max-pages 3
+
 # Run one bounded worker loop:
 python -m scripts.worker
 
@@ -85,7 +88,10 @@ Back up PostgreSQL and any local evidence/workspace files separately, and test r
 
 ## Current limitations
 
-- Browser research currently inspects one public page per lead. Deep multi-source research and official SAM.gov/USAspending connectors are not yet implemented.
+- Browser research now visits a bounded set of relevant same-site pages (homepage plus selected careers/jobs, contact/intake, capabilities/services or about pages). It does not crawl arbitrary external links.
+- CMS, analytics, technology, copyright-year and thin-content observations are weak signals only; they do not prove pain points or justify automatic lead rejection.
+- JavaScript is disabled during retrieval. Some JavaScript-rendered sites may therefore return partial evidence. The page budget defaults to three and can be raised to five; keep it low on machines with limited RAM.
+- Deep multi-source research and official SAM.gov/USAspending connectors are not yet implemented.
 - No outreach sending is implemented.
 - Skill self-improvement has schema scaffolding only; automatic promotion is not implemented.
 - Validate the installed Claude CLI's supported flags, authentication and unattended-use terms before a large batch.
