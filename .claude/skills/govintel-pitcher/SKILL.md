@@ -39,3 +39,13 @@ Use the DBS framework: Direction defines goals and guardrails, Blueprints define
 - A solution match is not proof that the customer needs it. Record prerequisites and unresolved integration requirements.
 - Keep priority scores explainable and deterministic; never use a model-generated score as the sole reason to contact a prospect.
 - Preserve the human review gate for opportunities, solution fit and all outreach drafts.
+
+
+## Evidence scoring and guarded learning
+- Score evidence quality separately from estimated impact, urgency and solution feasibility.
+- Record source counts and distinct source domains; deduplicate repeated URLs and use corroboration only as a bounded bonus.
+- A URL attached to an industry hypothesis does not make that hypothesis company-specific evidence.
+- Keep scoring versions and component breakdowns auditable. A priority score is for review triage, never an automatic contact or rejection decision.
+- Report research-quality signals separately from commercial outcomes. Commercial outcomes must be explicitly recorded by an operator and must not be inferred from draft approval.
+- Treat before/after experiment reports as observational, not causal proof. Record sample sizes and known limitations.
+- Learning experiments may recommend changes but cannot alter skills, prompts, permissions, credentials, spending, provider configuration or outreach rules. Skill changes require explicit human review and controlled regression testing; no automatic promotion is permitted by this workflow.
