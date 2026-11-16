@@ -65,3 +65,31 @@ def test_ambiguous_claim_indices_are_rejected():
 def test_unapproved_solution_never_matches():
     candidate = approved_solution(status="candidate")
     assert not match_approved_solutions({"capability_tags": ["document_search"]}, "", "", [candidate])
+
+
+
+def test_concept_solution_is_not_a_pitchable_match():
+    concept = approved_solution(delivery_status="concept")
+    assert not match_approved_solutions(
+        {"capability_tags": ["document_search"]}, "236220", "Construction", [concept]
+    )
+
+
+def test_hypothesis_without_a_source_is_capped_even_with_high_estimated_impact():
+    result = score_opportunities(
+        [{
+            "title": "Possible process improvement",
+            "description": "Industry pattern only",
+            "evidence_claim_indices": [0],
+            "impact": "high",
+            "urgency": "high",
+            "confidence": 0.99,
+            "capability_tags": ["document_search"],
+        }],
+        [{"evidence_type": "industry_hypothesis", "confidence": 0.99, "source_urls": []}],
+        [approved_solution()],
+        "236220",
+        "Construction",
+    )
+    assert result[0]["priority_score"] <= 35
+    assert result[0]["company_specific_evidence"] is False
