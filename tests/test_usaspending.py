@@ -93,6 +93,30 @@ def test_name_and_location_mismatch_is_rejected():
     assert result.status == "identity_unconfirmed"
 
 
+
+def test_multiple_awards_for_same_recipient_are_not_misclassified_as_ambiguous():
+    first = award()
+    second = award()
+    second["Award ID"] = "CONT_AWD_456_0002"
+    second["Award Amount"] = 100000
+    result = lookup_award_history(
+        {"company_name": "Acme Systems LLC", "city": "Austin", "state": "TX"},
+        session=FakeSession([first, second]),
+    )
+    assert result.status == "matched"
+    assert len(result.awards) == 2
+
+
+def test_distinct_recipient_identities_with_same_name_and_location_are_ambiguous():
+    first = award(uei="ABC123456789")
+    second = award(uei="XYZ987654321")
+    result = lookup_award_history(
+        {"company_name": "Acme Systems LLC", "city": "Austin", "state": "TX"},
+        session=FakeSession([first, second]),
+    )
+    assert result.status == "ambiguous"
+    assert result.awards == []
+
 def test_lookup_audit_records_no_match_status():
     from scripts.usaspending import lookup_evidence_item
     result = LookupResult("identity_unconfirmed", "legal_name_only", 0, None, [],
