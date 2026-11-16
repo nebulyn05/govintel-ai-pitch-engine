@@ -109,6 +109,7 @@ Back up PostgreSQL and any local evidence/workspace files separately, and test r
 - USAspending.gov is a public, unauthenticated source. Enrichment is bounded to at most 10 award results per lead and can be disabled with `USASPENDING_ENABLED=false`. Supply a `UEI` column in the lead CSV for the strongest identity match. Without UEI, exact legal-name and location corroboration are required; otherwise awards remain unattached.
 - JavaScript is disabled during retrieval. Some JavaScript-rendered sites may therefore return partial evidence. The page budget defaults to three and can be raised to five; keep it low on machines with limited RAM.
 - USAspending.gov public award-history lookup is integrated for a bounded set of recent/high-value federal prime awards. It searches by supplied UEI first; without UEI it requires exact normalized legal-name plus city/state corroboration. Name-only matches are never attached to a lead. Award records are context, not proof of current pain, budget, or buying intent. SAM.gov integration is not implemented.
-- No outreach sending is implemented.\n- The solution registry ships with candidate templates only; it contains no human-approved live offerings until an operator completes the review and approval workflow.
+- No outreach sending is implemented.
+- The solution registry ships with candidate templates only; it contains no human-approved live offerings until an operator completes the review and approval workflow.
 - Skill self-improvement has schema scaffolding only; automatic promotion is not implemented.
 - Validate the installed Claude CLI's supported flags, authentication and unattended-use terms before a large batch.
