@@ -129,6 +129,7 @@ def validate_payload(
         checks["unsupported_source_urls"] = sorted(set(unsupported_urls))[:20]
     if payload["outcome"] == "pitch_ready" and (not supported or not selected_key):
         payload["outcome"] = "needs_further_research"
+    if not selected_key:
         payload["proposed_solution"] = ""
         payload["pitch_text"] = ""
     return payload
@@ -237,6 +238,13 @@ def process_one(
             payload["outcome"] = "needs_further_research"
             payload["proposed_solution"] = ""
             payload["pitch_text"] = ""
+        elif payload["selected_solution_key"]:
+            selected_solution = next(
+                row for row in approved_solutions
+                if row["solution_key"] == payload["selected_solution_key"]
+            )
+            payload["proposed_solution"] = selected_solution["description"]
+            payload["delivery_status"] = selected_solution["delivery_status"]
         payload["quality_checks"]["opportunities_saved"] = saved_opportunities
         payload["quality_checks"]["top_opportunity_score"] = scored_opportunities[0]["priority_score"] if scored_opportunities else 0
         payload["quality_checks"]["approved_solution_count"] = len(approved_solutions)
