@@ -327,15 +327,16 @@ def save_opportunity_analysis(lead: dict, job_id: int, opportunities: list[dict]
                 """INSERT INTO opportunities(company_id,lead_id,research_job_id,title,description,
                        evidence_type,confidence,status,impact,urgency,evidence_score,impact_score,
                        urgency_score,feasibility_score,priority_score,evidence_claim_indices,
-                       capability_tags,buyer_role,review_status)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,'candidate',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                       capability_tags,buyer_role,review_status,evidence_quality,scoring_version)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,'candidate',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    RETURNING id""",
                 (lead["company_id"], lead["id"], job_id, item["title"], item["description"],
                  item["evidence_type"], item["confidence"], item["impact"], item["urgency"],
                  item["evidence_score"], item["impact_score"], item["urgency_score"],
                  item["feasibility_score"], item["priority_score"],
                  Jsonb(item["evidence_claim_indices"]), Jsonb(item["capability_tags"]),
-                 item["buyer_role"], item["review_status"]),
+                 item["buyer_role"], item["review_status"], Jsonb(item.get("evidence_quality") or {}),
+                 item.get("scoring_version", "1.0")),
             ).fetchone()
             opportunity_id = row["id"]
             for match in item["solution_matches"]:
