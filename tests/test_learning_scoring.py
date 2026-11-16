@@ -10,8 +10,8 @@ def test_independent_domains_add_bounded_corroboration_bonus():
         "evidence_type": "verified_fact", "confidence": 0.8,
         "source_urls": ["https://example.com/a", "https://agency.gov/b", "https://data.gov/c"],
     }])
-    assert one["independent_source_count"] == 1
-    assert two["independent_source_count"] == 3
+    assert one["distinct_source_domain_count"] == 1
+    assert two["distinct_source_domain_count"] == 3
     assert two["corroboration_bonus"] == 10
     assert two["score"] > one["score"]
 
