@@ -129,3 +129,41 @@ The dashboard binds to loopback only and uses no additional Python web framework
 Approval is blocked unless the draft is `pitch_ready`, its quality checks and claim list include source-backed evidence, a proposed solution exists, and a currently approved/matchable solution registry record is linked to one of the lead's opportunities. The dashboard does not send email, call a CRM, or authorize outreach. Treat approval as an internal draft-review decision only.
 
 Keep this service on the local machine. It intentionally refuses non-loopback bind addresses. Do not expose the review port to a LAN or the public internet.
+
+
+## Evidence prioritization and guarded learning (Batch 6)
+
+Opportunity evidence scoring is versioned (`2.0`) and records its components: claim count, confidence, source count, distinct source domains and a bounded corroboration bonus. Verified facts and evidence-supported inferences receive stronger evidence weights than industry hypotheses. A URL attached to an industry hypothesis does not turn it into company-specific evidence. The existing priority formula remains explainable: 40% evidence quality, 20% estimated impact, 20% estimated urgency and 20% approved-solution feasibility. Without company-specific source-backed evidence, the score remains capped at 35/100.
+
+The review queue is ordered by highest opportunity priority and evidence score, not simply by newest draft. The CLI can show the same ranked lead queue:
+
+```bash
+python -m scripts.orchestrator priority-list --limit 50
+```
+
+### Separate research quality from commercial outcomes
+
+```bash
+# Show two separate metric groups
+python -m scripts.orchestrator learning-report
+
+# Record a manually observed commercial outcome for a reviewed draft
+python -m scripts.orchestrator outcome-record --draft-id 123 \
+  --type commercial_meeting --recorded-by "Operator ID" --notes "Introductory call held"
+
+# Propose an observational research-quality experiment
+python -m scripts.orchestrator learning-propose --type research_quality \
+  --hypothesis "Adding a second official source should improve evidence completeness"
+
+# Evaluate a proposed experiment against a fresh snapshot
+python -m scripts.orchestrator learning-evaluate --id 1
+python -m scripts.orchestrator learning-list
+```
+
+Supported commercial outcome types are `commercial_reply`, `commercial_meeting`, `commercial_won`, `commercial_lost`, and `commercial_no_response`. These are manually recorded observations; the system does not infer a sale or reply from a pitch approval.
+
+Learning experiments compare stored baseline snapshots with later observational snapshots. They report numeric deltas but explicitly do not claim causation. Research-quality metrics (source-backed drafts, evidence gaps, reviewer decisions and evidence scores) are reported separately from commercial outcomes (replies, meetings, wins, losses and no response).
+
+### Guarded self-improvement policy
+
+This batch adds measurement and experiment bookkeeping only. It does **not** edit or promote Claude skills, prompts, scoring weights, permissions, credentials, provider settings, spending limits or outreach rules. A `skill_change` experiment can only reach `awaiting_human_approval`; promotion and rollback require a separate, explicit human-controlled implementation and review. No learning result can authorize outreach or bypass the pitch-review gate.

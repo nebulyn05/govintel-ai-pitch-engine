@@ -247,6 +247,12 @@ def process_one(
             payload["delivery_status"] = selected_solution["delivery_status"]
         payload["quality_checks"]["opportunities_saved"] = saved_opportunities
         payload["quality_checks"]["top_opportunity_score"] = scored_opportunities[0]["priority_score"] if scored_opportunities else 0
+        payload["quality_checks"]["opportunity_scoring_version"] = (
+            scored_opportunities[0]["scoring_version"] if scored_opportunities else "2.0"
+        )
+        payload["quality_checks"]["top_opportunity_evidence_quality"] = (
+            scored_opportunities[0]["evidence_quality"] if scored_opportunities else {}
+        )
         payload["quality_checks"]["approved_solution_count"] = len(approved_solutions)
         payload["quality_checks"]["matched_solution_count"] = sum(len(item["solution_matches"]) for item in scored_opportunities)
         payload["quality_checks"]["human_review_required"] = True

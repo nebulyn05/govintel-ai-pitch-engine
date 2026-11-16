@@ -87,6 +87,22 @@ def main(argv: list[str] | None = None) -> int:
     reject.add_argument("--version", type=int, default=1)
     reject.add_argument("--reviewer", required=True)
 
+    sub.add_parser("learning-report", help="Show research-quality and commercial-outcome metrics separately")
+    propose = sub.add_parser("learning-propose", help="Create an observational learning experiment; does not change production behavior")
+    propose.add_argument("--type", choices=["research_quality", "commercial_outcome", "skill_change"], required=True)
+    propose.add_argument("--hypothesis", required=True)
+    propose.add_argument("--candidate-json", default="{}")
+    evaluate = sub.add_parser("learning-evaluate", help="Evaluate a proposed experiment against a fresh snapshot")
+    evaluate.add_argument("--id", type=int, required=True)
+    sub.add_parser("learning-list", help="List recent learning experiments")
+    outcome = sub.add_parser("outcome-record", help="Record a manually observed commercial outcome")
+    outcome.add_argument("--draft-id", type=int, required=True)
+    outcome.add_argument("--type", choices=["commercial_reply", "commercial_meeting", "commercial_won", "commercial_lost", "commercial_no_response"], required=True)
+    outcome.add_argument("--notes", default="")
+    outcome.add_argument("--recorded-by", required=True)
+    priority = sub.add_parser("priority-list", help="List leads by explainable opportunity priority")
+    priority.add_argument("--limit", type=int, default=50)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "init-db":
@@ -136,6 +152,42 @@ def main(argv: list[str] | None = None) -> int:
             reject_solution(args.key, args.version, args.reviewer)
             print(f"Rejected {args.key} v{args.version}.")
             return 0
+
+        if args.command in {"learning-report", "learning-propose", "learning-evaluate", "learning-list", "outcome-record", "priority-list"}:
+            from scripts.learning import (
+                commercial_outcome_snapshot, create_experiment, evaluate_experiment,
+                list_experiments, priority_queue, record_commercial_outcome,
+                research_quality_snapshot,
+            )
+            if args.command == "learning-report":
+                print(json.dumps({
+                    "research_quality": research_quality_snapshot(),
+                    "commercial_outcomes": commercial_outcome_snapshot(),
+                }, indent=2, default=str))
+                return 0
+            if args.command == "learning-propose":
+                candidate = json.loads(args.candidate_json)
+                if not isinstance(candidate, dict):
+                    parser.error("--candidate-json must decode to a JSON object")
+                experiment_id = create_experiment(args.type, args.hypothesis, candidate)
+                print(f"Created proposed experiment {experiment_id}; no production settings or skills were changed.")
+                return 0
+            if args.command == "learning-evaluate":
+                result = evaluate_experiment(args.id)
+                print(json.dumps(result, indent=2, default=str))
+                return 0
+            if args.command == "learning-list":
+                print(json.dumps(list_experiments(), indent=2, default=str))
+                return 0
+            if args.command == "outcome-record":
+                record_commercial_outcome(args.draft_id, args.type, {
+                    "notes": args.notes, "recorded_by": args.recorded_by,
+                })
+                print(f"Recorded {args.type} for draft {args.draft_id}.")
+                return 0
+            if args.command == "priority-list":
+                print(json.dumps(priority_queue(args.limit), indent=2, default=str))
+                return 0
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
