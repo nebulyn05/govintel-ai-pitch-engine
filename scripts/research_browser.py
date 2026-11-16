@@ -153,7 +153,7 @@ def research_website(
             page = context.new_page()
             queue = [target]
             try:
-                while queue and len(evidence) < max_pages:
+                while queue and attempted < max_pages:
                     current = queue.pop(0)
                     current = urldefrag(current)[0]
                     if current in seen:
@@ -161,6 +161,7 @@ def research_website(
                     seen.add(current)
                     if not _same_site(current, target) or not _public_http_url(current):
                         continue
+                    attempted += 1
                     try:
                         response = page.goto(current, wait_until="domcontentloaded", timeout=timeout_ms)
                         final_url = urldefrag(page.url)[0]
@@ -206,7 +207,7 @@ def research_website(
                                 parsed_origin = urlparse(target)\n                                site_root = urlunparse((parsed_origin.scheme, parsed_origin.netloc, "/", "", "", ""))\n                                fallback = urljoin(site_root, path.lstrip("/"))
                                 candidates.setdefault(fallback, (1, kind))
                             ordered = sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))
-                            queue.extend(candidate for candidate, _ in ordered if candidate not in seen)
+                            queue.extend(candidate for candidate, _ in ordered[:12] if candidate not in seen)
                     except PlaywrightTimeoutError:
                         failures.append(f"Navigation timed out: {current}")
                     except Exception as exc:
@@ -217,7 +218,7 @@ def research_website(
                     "reason": "; ".join(failures[:5]),
                     "evidence": evidence,
                     "signals": {
-                        "pages_visited": len(evidence),
+                        "pages_visited": len(evidence),\n                        "page_attempts": attempted,
                         "technology_signals": sorted(aggregate),
                         "page_signals": signal_records,
                         "signals_are_not_pain_points": True,
