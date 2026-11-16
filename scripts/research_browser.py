@@ -5,7 +5,7 @@ import ipaddress
 import re
 import socket
 from collections import Counter
-from urllib.parse import urljoin, urlparse, urldefrag
+from urllib.parse import urljoin, urlparse, urldefrag, urlunparse
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -203,7 +203,7 @@ def research_website(
                                 if score:
                                     candidates[urldefrag(href)[0]] = (score, kind)
                             for path, kind in FALLBACK_PATHS:
-                                fallback = urljoin(target.rstrip("/") + "/", path.lstrip("/"))
+                                parsed_origin = urlparse(target)\n                                site_root = urlunparse((parsed_origin.scheme, parsed_origin.netloc, "/", "", "", ""))\n                                fallback = urljoin(site_root, path.lstrip("/"))
                                 candidates.setdefault(fallback, (1, kind))
                             ordered = sorted(candidates.items(), key=lambda item: (-item[1][0], item[0]))
                             queue.extend(candidate for candidate, _ in ordered if candidate not in seen)
