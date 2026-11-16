@@ -113,3 +113,19 @@ Back up PostgreSQL and any local evidence/workspace files separately, and test r
 - The solution registry ships with candidate templates only; it contains no human-approved live offerings until an operator completes the review and approval workflow.
 - Skill self-improvement has schema scaffolding only; automatic promotion is not implemented.
 - Validate the installed Claude CLI's supported flags, authentication and unattended-use terms before a large batch.
+
+
+## Local human-review dashboard (Batch 5)
+
+Start the dashboard after the database is configured:
+
+```bash
+python -m scripts.review_dashboard
+# Open http://127.0.0.1:8765 on the same machine
+```
+
+The dashboard binds to loopback only and uses no additional Python web framework. It displays the latest pending drafts, company context, claims and source URLs, captured evidence, opportunity scores and solution-match prerequisites. Review actions are **Approve**, **Edit**, **Reject**, and **Request further research**. Reviewer identity, timestamp, notes and action are written to the pitch record and the `outcomes` audit table. Edits remain pending until separately approved.
+
+Approval is blocked unless the draft is `pitch_ready`, its quality checks and claim list include source-backed evidence, a proposed solution exists, and a currently approved/matchable solution registry record is linked to one of the lead's opportunities. The dashboard does not send email, call a CRM, or authorize outreach. Treat approval as an internal draft-review decision only.
+
+Keep this service on the local machine. It intentionally refuses non-loopback bind addresses. Do not expose the review port to a LAN or the public internet.
