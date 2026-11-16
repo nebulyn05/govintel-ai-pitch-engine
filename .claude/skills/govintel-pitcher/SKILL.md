@@ -29,3 +29,13 @@ Use the DBS framework: Direction defines goals and guardrails, Blueprints define
 - Skill changes must be versioned and evaluated. Only predefined low-risk changes may be auto-promoted after regression checks.
 - Changes to security, permissions, evidence standards, credentials, spending, paid providers, system instructions, or outreach authorization require human approval.
 - Track research quality separately from commercial outcomes.
+
+
+## Opportunity scoring and solution governance
+- Extract opportunities as structured records linked to claim indices; never create an opportunity without explicit supporting claims.
+- Keep evidence strength separate from impact, urgency and solution feasibility. Industry hypotheses are capped and must not be ranked as company-verified opportunities.
+- Use only solution registry entries with status=approved for matching or pitch recommendations.
+- Candidate, rejected, concept and restricted solutions are not pitchable. Registry approval requires a human reviewer, explicit approved claims, capability tags and documented prerequisites.
+- A solution match is not proof that the customer needs it. Record prerequisites and unresolved integration requirements.
+- Keep priority scores explainable and deterministic; never use a model-generated score as the sole reason to contact a prospect.
+- Preserve the human review gate for opportunities, solution fit and all outreach drafts.
