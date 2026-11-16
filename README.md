@@ -43,7 +43,7 @@ Ports bind to loopback only. Do not use the example password on a shared or expo
 
 ## Queue and process a pilot
 
-Start with 10–20 leads before a larger batch. CSV columns can include `Legal Business Name`, `Website`, `NAICS Code`, `City`, `State`, `POC Name`, `POC Title`, `POC Email`, and `POC Phone`.
+Start with 10–20 leads before a larger batch. CSV columns can include `Legal Business Name`, `Website`, `NAICS Code`, `City`, `State`, `UEI`, `POC Name`, `POC Title`, `POC Email`, and `POC Phone`.
 
 ```bash
 python -m scripts.orchestrator enqueue --input leads.csv --campaign-id pilot
@@ -90,8 +90,9 @@ Back up PostgreSQL and any local evidence/workspace files separately, and test r
 
 - Browser research now visits a bounded set of relevant same-site pages (homepage plus selected careers/jobs, contact/intake, capabilities/services or about pages). It does not crawl arbitrary external links.
 - CMS, analytics, technology, copyright-year and thin-content observations are weak signals only; they do not prove pain points or justify automatic lead rejection.
+- USAspending.gov is a public, unauthenticated source. Enrichment is bounded to at most 10 award results per lead and can be disabled with `USASPENDING_ENABLED=false`. Supply a `UEI` column in the lead CSV for the strongest identity match. Without UEI, exact legal-name and location corroboration are required; otherwise awards remain unattached.
 - JavaScript is disabled during retrieval. Some JavaScript-rendered sites may therefore return partial evidence. The page budget defaults to three and can be raised to five; keep it low on machines with limited RAM.
-- Deep multi-source research and official SAM.gov/USAspending connectors are not yet implemented.
+- USAspending.gov public award-history lookup is integrated for a bounded set of recent/high-value federal prime awards. It searches by supplied UEI first; without UEI it requires exact normalized legal-name plus city/state corroboration. Name-only matches are never attached to a lead. Award records are context, not proof of current pain, budget, or buying intent. SAM.gov integration is not implemented.
 - No outreach sending is implemented.
 - Skill self-improvement has schema scaffolding only; automatic promotion is not implemented.
 - Validate the installed Claude CLI's supported flags, authentication and unattended-use terms before a large batch.
