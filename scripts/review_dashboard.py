@@ -44,10 +44,16 @@ button{cursor:pointer;margin:.25rem}.danger{border:1px solid #c66}
 def load_queue():
     with connect() as conn:
         return conn.execute("""SELECT p.id,p.lead_id,p.version,p.outcome,p.opportunity_summary,
-            p.proposed_solution,p.created_at,l.company_name,l.website,l.naics_code,l.city,l.state
+            p.proposed_solution,p.created_at,l.company_name,l.website,l.naics_code,l.city,l.state,
+            COALESCE(best.priority_score,0) AS priority_score,
+            COALESCE(best.evidence_score,0) AS evidence_score,
+            COALESCE(best.title,'No scored opportunity') AS top_opportunity
             FROM pitch_drafts p JOIN leads l ON l.id=p.lead_id
+            LEFT JOIN LATERAL (SELECT o.priority_score,o.evidence_score,o.title
+                FROM opportunities o WHERE o.lead_id=p.lead_id
+                ORDER BY o.priority_score DESC,o.id DESC LIMIT 1) best ON TRUE
             WHERE COALESCE(p.review_status,'pending')='pending'
-            ORDER BY p.created_at DESC,p.id DESC LIMIT 200""").fetchall()
+            ORDER BY priority_score DESC,evidence_score DESC,p.created_at DESC,p.id DESC LIMIT 200""").fetchall()
 
 
 def load_detail(draft_id: int):
@@ -165,7 +171,10 @@ class Handler(BaseHTTPRequestHandler):
                 f'<article><h3><a href="/draft/{r["id"]}">{esc(r["company_name"])}</a></h3>'
                 f'<p>{esc(r["website"])} · {esc(r["city"])} {esc(r["state"])} · '
                 f'NAICS {esc(r["naics_code"])}</p><p>{esc(r["outcome"])} · '
-                f'Version {r["version"]}</p><p>{esc(r["opportunity_summary"])}</p></article>'
+                f'Version {r["version"]}</p><p><b>Priority:</b> {esc(r["priority_score"])}/100 · '
+                f'<b>Evidence:</b> {esc(r["evidence_score"])}/100</p>'
+                f'<p><b>Top opportunity:</b> {esc(r["top_opportunity"])}</p>'
+                f'<p>{esc(r["opportunity_summary"])}</p></article>'
                 for r in rows)
             self.send_page("Review queue", f'<h1>Pending review ({len(rows)})</h1>{items or "<p>No drafts awaiting review.</p>"}')
             return
