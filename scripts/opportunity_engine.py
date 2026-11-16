@@ -43,7 +43,7 @@ def score_claim_evidence(claims: list[dict]) -> dict:
     """Score claim grounding separately from model-estimated impact and urgency."""
     if not claims:
         return {"score": 0.0, "company_specific": False, "claim_count": 0,
-                "source_count": 0, "independent_source_count": 0,
+                "source_count": 0, "distinct_source_domain_count": 0,
                 "corroboration_bonus": 0.0, "mean_confidence": 0.0}
     weights = {"verified_fact": 1.0, "evidence_supported_inference": 0.75,
                "industry_hypothesis": 0.20}
@@ -71,7 +71,7 @@ def score_claim_evidence(claims: list[dict]) -> dict:
         "company_specific": has_company_specific,
         "claim_count": len(claims),
         "source_count": len(urls_seen),
-        "independent_source_count": len(domains),
+        "distinct_source_domain_count": len(domains),
         "corroboration_bonus": round(bonus, 2),
         "mean_confidence": round(sum(confidences) / len(confidences), 3),
     }
