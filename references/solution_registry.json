@@ -9,8 +9,8 @@
     "approved_claims": [],
     "requirements": {
       "capability_tags": ["document_search", "document_extraction", "knowledge_retrieval"],
-      "supported_sectors": ["construction", "professional, scientific, and technical services", "manufacturing", "government contracting"],
-      "supported_naics": [],
+      "supported_sectors": ["Commercial and Institutional Building Construction", "HVAC and Commercial Refrigeration Equipment Manufacturing"],
+      "supported_naics": ["236220", "333415"],
       "prerequisites": ["Customer-approved document corpus", "Named process owner", "Validation of document formats and access controls"],
       "integration_notes": ["Assess existing document repositories before estimating integration effort"],
       "complexity": "medium"
@@ -43,8 +43,8 @@
     "approved_claims": [],
     "requirements": {
       "capability_tags": ["field_service", "work_order_management", "quality_assurance", "mobile_workflows"],
-      "supported_sectors": ["construction", "janitorial services", "facilities management"],
-      "supported_naics": [],
+      "supported_sectors": ["Commercial and Institutional Building Construction", "Janitorial Services"],
+      "supported_naics": ["236220", "561720"],
       "prerequisites": ["Defined work-order lifecycle", "Field user roles", "Connectivity and device requirements assessment"],
       "integration_notes": ["Assess existing CMMS, ERP and workforce systems"],
       "complexity": "medium"
@@ -60,8 +60,8 @@
     "approved_claims": [],
     "requirements": {
       "capability_tags": ["iot_monitoring", "condition_monitoring", "sensor_alerting", "asset_monitoring"],
-      "supported_sectors": ["manufacturing", "facilities management", "utilities"],
-      "supported_naics": [],
+      "supported_sectors": ["HVAC and Commercial Refrigeration Equipment Manufacturing"],
+      "supported_naics": ["333415"],
       "prerequisites": ["Defined monitored asset and variables", "Site survey", "Sensor and network compatibility assessment"],
       "integration_notes": ["No safety-critical control or shutdown functions without separate engineering review"],
       "complexity": "high"
