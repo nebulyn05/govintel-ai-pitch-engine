@@ -56,13 +56,13 @@ def score_claim_evidence(claims: list[dict]) -> dict:
         urls = claim.get("source_urls") or []
         valid_domains = {_source_domain(url) for url in urls if isinstance(url, str)}
         valid_domains.discard("")
-        domains.update(valid_domains)
-        urls_seen.update(url for url in urls if isinstance(url, str))
         source_backed = bool(valid_domains) and kind in {
             "verified_fact", "evidence_supported_inference"
         }
         if source_backed:
             has_company_specific = True
+            domains.update(valid_domains)
+            urls_seen.update(url for url in urls if isinstance(url, str))
         values.append(confidence * weights.get(kind, 0.0) * 100)
     base = sum(values) / len(values)
     bonus = min(15.0, max(0, len(domains) - 1) * 5.0)
