@@ -119,3 +119,12 @@ ALTER TABLE solution_candidates ADD COLUMN IF NOT EXISTS review_status TEXT NOT 
 ALTER TABLE solution_registry ADD COLUMN IF NOT EXISTS reviewed_by TEXT NOT NULL DEFAULT '';
 ALTER TABLE solution_registry ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS solution_registry_status_idx ON solution_registry(status,solution_key);
+
+
+-- Batch 5: auditable human review state for pitch drafts.
+ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS reviewed_by TEXT NOT NULL DEFAULT '';
+ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS reviewer_notes TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS pitch_drafts_review_queue_idx
+    ON pitch_drafts(review_status,created_at DESC,id DESC);
