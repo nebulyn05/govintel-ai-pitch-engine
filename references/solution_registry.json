@@ -1,0 +1,87 @@
+[
+  {
+    "solution_key": "private_document_assistant",
+    "version": 1,
+    "title": "Private Document Intelligence Assistant",
+    "description": "A locally hosted retrieval and document-review workflow over customer-approved files, with source citations and human verification.",
+    "delivery_status": "concept",
+    "status": "candidate",
+    "approved_claims": [],
+    "requirements": {
+      "capability_tags": ["document_search", "document_extraction", "knowledge_retrieval"],
+      "supported_sectors": ["construction", "professional, scientific, and technical services", "manufacturing", "government contracting"],
+      "supported_naics": [],
+      "prerequisites": ["Customer-approved document corpus", "Named process owner", "Validation of document formats and access controls"],
+      "integration_notes": ["Assess existing document repositories before estimating integration effort"],
+      "complexity": "medium"
+    }
+  },
+  {
+    "solution_key": "workflow_automation",
+    "version": 1,
+    "title": "Workflow and Case Automation",
+    "description": "A scoped workflow automation service for routing, status tracking, notifications and exception handling across approved business processes.",
+    "delivery_status": "concept",
+    "status": "candidate",
+    "approved_claims": [],
+    "requirements": {
+      "capability_tags": ["workflow_automation", "case_management", "process_orchestration", "notifications"],
+      "supported_sectors": [],
+      "supported_naics": [],
+      "prerequisites": ["Documented current process", "Process owner", "Access to supported systems or approved APIs"],
+      "integration_notes": ["Do not promise integration until target systems and APIs are assessed"],
+      "complexity": "medium"
+    }
+  },
+  {
+    "solution_key": "field_service_operations",
+    "version": 1,
+    "title": "Field Service and Work-Order Coordination",
+    "description": "A field operations workflow for work orders, task assignment, service records and operational visibility.",
+    "delivery_status": "concept",
+    "status": "candidate",
+    "approved_claims": [],
+    "requirements": {
+      "capability_tags": ["field_service", "work_order_management", "quality_assurance", "mobile_workflows"],
+      "supported_sectors": ["construction", "janitorial services", "facilities management"],
+      "supported_naics": [],
+      "prerequisites": ["Defined work-order lifecycle", "Field user roles", "Connectivity and device requirements assessment"],
+      "integration_notes": ["Assess existing CMMS, ERP and workforce systems"],
+      "complexity": "medium"
+    }
+  },
+  {
+    "solution_key": "iot_condition_monitoring",
+    "version": 1,
+    "title": "IoT Condition Monitoring and Alerts",
+    "description": "A sensor and alerting concept for selected equipment or facility conditions, subject to site survey and hardware compatibility.",
+    "delivery_status": "concept",
+    "status": "candidate",
+    "approved_claims": [],
+    "requirements": {
+      "capability_tags": ["iot_monitoring", "condition_monitoring", "sensor_alerting", "asset_monitoring"],
+      "supported_sectors": ["manufacturing", "facilities management", "utilities"],
+      "supported_naics": [],
+      "prerequisites": ["Defined monitored asset and variables", "Site survey", "Sensor and network compatibility assessment"],
+      "integration_notes": ["No safety-critical control or shutdown functions without separate engineering review"],
+      "complexity": "high"
+    }
+  },
+  {
+    "solution_key": "systems_integration",
+    "version": 1,
+    "title": "Business Systems Integration",
+    "description": "A scoped integration layer connecting approved systems through documented APIs, files or supported messaging interfaces.",
+    "delivery_status": "concept",
+    "status": "candidate",
+    "approved_claims": [],
+    "requirements": {
+      "capability_tags": ["systems_integration", "api_integration", "data_synchronization"],
+      "supported_sectors": [],
+      "supported_naics": [],
+      "prerequisites": ["Inventory of source and target systems", "API or export access", "Data ownership and mapping rules"],
+      "integration_notes": ["Assess authentication, rate limits, data quality and vendor restrictions"],
+      "complexity": "medium"
+    }
+  }
+]
