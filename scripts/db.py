@@ -221,10 +221,11 @@ def get_approved_solutions() -> list[dict]:
     """Return only human-approved, non-restricted registry entries."""
     with connect() as conn:
         return conn.execute(
-            """SELECT id,solution_key,version,title,description,delivery_status,
+            """SELECT DISTINCT ON (solution_key) id,solution_key,version,title,description,delivery_status,
                       approved_claims,requirements,status
-               FROM solution_registry WHERE status='approved' AND delivery_status IN ('available','buildable','partner_required')
-               ORDER BY solution_key,version DESC"""
+               FROM solution_registry
+               WHERE status='approved' AND delivery_status IN ('available','buildable','partner_required')
+               ORDER BY solution_key,version DESC,reviewed_at DESC"""
         ).fetchall()
 
 
@@ -287,15 +288,16 @@ def approve_solution(solution_key: str, version: int, reviewer: str) -> None:
             raise ValueError("Solution registry entry not found.")
         if row["status"] != "candidate":
             raise ValueError("Only candidate registry entries can be approved.")
-        if row["delivery_status"] == "restricted":
-            raise ValueError("Restricted solutions cannot be approved for matching.")
+        if row["delivery_status"] not in {"available", "buildable", "partner_required"}:
+            raise ValueError("Only available, buildable or partner-required solutions can be approved for matching.")
         claims = row["approved_claims"] or []
         requirements = row["requirements"] or {}
         if not claims or not all(isinstance(item, str) and item.strip() for item in claims):
             raise ValueError("Add explicit approved_claims before approving this solution.")
         if not isinstance(requirements.get("capability_tags"), list) or not requirements["capability_tags"]:
             raise ValueError("Add capability_tags before approving this solution.")
-        if not isinstance(requirements.get("prerequisites"), list) or not requirements["prerequisites"]:
+        prerequisites = requirements.get("prerequisites")
+        if not isinstance(prerequisites, list) or not prerequisites or not all(isinstance(value, str) and value.strip() for value in prerequisites):
             raise ValueError("Document prerequisites before approving this solution.")
         conn.execute(
             """UPDATE solution_registry SET status='approved',reviewed_by=%s,reviewed_at=NOW()
