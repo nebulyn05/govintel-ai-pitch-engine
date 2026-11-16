@@ -152,7 +152,7 @@ def save_evidence(lead: dict, job_id: int, item: dict) -> None:
         conn.execute(
             """INSERT INTO evidence_items(company_id,lead_id,research_job_id,source_url,source_title,
                excerpt,evidence_type,content_hash,metadata)
-               VALUES (%s,%s,%s,%s,%s,'source_metadata',%s,%s)
+               VALUES (%s,%s,%s,%s,%s,%s,'source_metadata',%s,%s)
                ON CONFLICT(lead_id,source_url,content_hash) DO NOTHING""",
             (lead["company_id"],lead["id"],job_id,url,str(item.get("title") or "")[:500],
              excerpt,digest,Jsonb(item.get("metadata") or {})),
