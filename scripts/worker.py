@@ -14,7 +14,6 @@ from scripts.db import (
     get_approved_solutions, save_opportunity_analysis,
 )
 from scripts.research_browser import research_website
-from scripts.research_browser import research_website
 
 ROOT = Path(__file__).resolve().parents[1]
 BANNED = ("revolutionize", "paradigm shift", "cutting-edge", "streamline", "next-gen", "digital transformation")
