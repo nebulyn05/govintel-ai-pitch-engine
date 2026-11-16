@@ -112,8 +112,13 @@ def record_review(draft_id: int, action: str, reviewer: str, reason: str, edited
                 JOIN solution_registry sr ON sr.id=sc.solution_registry_id
                 JOIN opportunities o ON o.id=sc.opportunity_id
                 WHERE o.lead_id=%s AND sr.status='approved'
-                AND sr.delivery_status IN ('available','buildable','partner_required') LIMIT 1""",
-                (draft["lead_id"],)).fetchone()
+                AND sr.delivery_status IN ('available','buildable','partner_required')
+                AND sr.description=%s
+                AND sr.id=(SELECT latest.id FROM solution_registry latest
+                    WHERE latest.solution_key=sr.solution_key AND latest.status='approved'
+                    AND latest.delivery_status IN ('available','buildable','partner_required')
+                    ORDER BY latest.version DESC,latest.reviewed_at DESC LIMIT 1)
+                LIMIT 1""", (draft["lead_id"],draft["proposed_solution"])).fetchone()
             if not matched:
                 raise ValueError("Approval blocked: no currently approved solution match is recorded.")
             new_status = "approved"
