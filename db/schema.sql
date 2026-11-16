@@ -128,3 +128,10 @@ ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 ALTER TABLE pitch_drafts ADD COLUMN IF NOT EXISTS reviewer_notes TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS pitch_drafts_review_queue_idx
     ON pitch_drafts(review_status,created_at DESC,id DESC);
+
+
+-- Batch 6: evidence score provenance and versioned learning evaluations.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS evidence_quality JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS scoring_version TEXT NOT NULL DEFAULT '1.0';
+CREATE INDEX IF NOT EXISTS opportunities_priority_review_idx
+    ON opportunities(review_status,priority_score DESC,evidence_score DESC,id DESC);
