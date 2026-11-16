@@ -12,6 +12,7 @@ from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "db" / "schema.sql"
+STALE_JOB_MINUTES = 20
 
 
 def database_url() -> str:
@@ -28,9 +29,7 @@ def connect():
 
 def init_db() -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
-    # Execute one DDL statement at a time for compatibility with PostgreSQL drivers.
     with connect() as conn:
-        # Split only on statement-terminating semicolons, not punctuation in SQL comments or literals.
         for statement in re.split(r";\s*(?=\n|$)", schema):
             if statement.strip():
                 conn.execute(statement)
@@ -59,7 +58,8 @@ def identity_key(company_name: str, website: str) -> tuple[str, str, str]:
 
 
 def enqueue_lead(row: dict[str, str], campaign_id: str = "local", max_attempts: int = 3) -> tuple[int, bool]:
-    from psycopg.types.json import Jsonb
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be >= 1")
     company_name = (row.get("Legal Business Name") or row.get("Company Name") or row.get("company_name") or "").strip()
     website = (row.get("Website") or row.get("website") or "").strip()
     if not company_name and not website:
@@ -108,17 +108,29 @@ def enqueue_lead(row: dict[str, str], campaign_id: str = "local", max_attempts: 
 
 def claim_next_job():
     with connect() as conn:
+        # A worker that dies on its final attempt must not strand a job in "running".
+        conn.execute(
+            """UPDATE research_jobs SET status='failed_final',locked_at=NULL,
+                 finished_at=NOW(),updated_at=NOW(),
+                 last_error=CASE WHEN last_error='' THEN 'Worker lease expired after final attempt'
+                                 ELSE last_error || E'\\nWorker lease expired after final attempt' END
+               WHERE status='running' AND attempts>=max_attempts
+                 AND (locked_at IS NULL OR locked_at<NOW()-(%s * INTERVAL '1 minute'))""",
+            (STALE_JOB_MINUTES,),
+        )
         return conn.execute(
             """WITH candidate AS (
                  SELECT id FROM research_jobs
                  WHERE (status IN ('queued','failed_retryable') AND available_at<=NOW())
-                    OR (status='running' AND locked_at<NOW()-INTERVAL '20 minutes' AND attempts<max_attempts)
+                    OR (status='running' AND attempts<max_attempts
+                        AND (locked_at IS NULL OR locked_at<NOW()-(%s * INTERVAL '1 minute')))
                  ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1
                )
                UPDATE research_jobs j SET status='running',attempts=j.attempts+1,locked_at=NOW(),
                  started_at=COALESCE(j.started_at,NOW()),updated_at=NOW(),last_error=''
                FROM candidate WHERE j.id=candidate.id
-               RETURNING j.id AS job_id,j.lead_id,j.attempts,j.max_attempts"""
+               RETURNING j.id AS job_id,j.lead_id,j.attempts,j.max_attempts""",
+            (STALE_JOB_MINUTES,),
         ).fetchone()
 
 
@@ -131,7 +143,6 @@ def get_lead(lead_id: int):
 
 
 def save_evidence(lead: dict, job_id: int, item: dict) -> None:
-    import json
     url = str(item.get("url") or "").strip()
     if not url:
         return
@@ -141,7 +152,7 @@ def save_evidence(lead: dict, job_id: int, item: dict) -> None:
         conn.execute(
             """INSERT INTO evidence_items(company_id,lead_id,research_job_id,source_url,source_title,
                excerpt,evidence_type,content_hash,metadata)
-               VALUES (%s,%s,%s,%s,%s,%s,'source_metadata',%s,%s)
+               VALUES (%s,%s,%s,%s,%s,'source_metadata',%s,%s)
                ON CONFLICT(lead_id,source_url,content_hash) DO NOTHING""",
             (lead["company_id"],lead["id"],job_id,url,str(item.get("title") or "")[:500],
              excerpt,digest,Jsonb(item.get("metadata") or {})),
@@ -149,12 +160,10 @@ def save_evidence(lead: dict, job_id: int, item: dict) -> None:
 
 
 def save_pitch(lead: dict, job_id: int, payload: dict) -> None:
-    outcome = payload.get("outcome")
-    if outcome not in {"pitch_ready","needs_further_research","do_not_pursue"}:
-        outcome = "needs_further_research"
-    claims = payload.get("claims") if isinstance(payload.get("claims"), list) else []
-    assumptions = payload.get("assumptions") if isinstance(payload.get("assumptions"), list) else []
-    checks = payload.get("quality_checks") if isinstance(payload.get("quality_checks"), dict) else {}
+    outcome = payload["outcome"]
+    claims = payload["claims"]
+    assumptions = payload["assumptions"]
+    checks = payload["quality_checks"]
     with connect() as conn:
         version = conn.execute("SELECT COALESCE(MAX(version),0)+1 AS v FROM pitch_drafts WHERE lead_id=%s",
                                (lead["id"],)).fetchone()["v"]
@@ -162,13 +171,11 @@ def save_pitch(lead: dict, job_id: int, payload: dict) -> None:
             """INSERT INTO pitch_drafts(company_id,lead_id,research_job_id,version,outcome,channel,claims,
                opportunity_summary,proposed_solution,pitch_text,assumptions,quality_checks)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (lead["company_id"],lead["id"],job_id,version,outcome,
-             str(payload.get("channel") or "review_required")[:80],Jsonb(claims),
-             str(payload.get("opportunity_summary") or "")[:5000],
-             str(payload.get("proposed_solution") or "")[:5000],
-             str(payload.get("pitch_text") or "")[:10000],Jsonb(assumptions),Jsonb(checks)),
+            (lead["company_id"],lead["id"],job_id,version,outcome,payload["channel"],Jsonb(claims),
+             payload["opportunity_summary"],payload["proposed_solution"],payload["pitch_text"],
+             Jsonb(assumptions),Jsonb(checks)),
         )
-        conn.execute("UPDATE research_jobs SET status='completed',finished_at=NOW(),locked_at=NULL,updated_at=NOW() WHERE id=%s",
+        conn.execute("UPDATE research_jobs SET status='completed',finished_at=NOW(),locked_at=NULL,updated_at=NOW() WHERE id=%s AND status='running'",
                      (job_id,))
 
 
@@ -179,7 +186,7 @@ def fail_job(job_id: int, attempts: int, max_attempts: int, error: str) -> None:
             """UPDATE research_jobs SET status=%s,last_error=%s,
                available_at=NOW()+(INTERVAL '30 seconds' * %s),locked_at=NULL,
                finished_at=CASE WHEN %s='failed_final' THEN NOW() ELSE NULL END,updated_at=NOW()
-               WHERE id=%s""",
+               WHERE id=%s AND status='running'""",
             (status,error[:2000],max(1,attempts),status,job_id),
         )
 
