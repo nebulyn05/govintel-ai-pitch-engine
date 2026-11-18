@@ -289,26 +289,35 @@ def main() -> int:
     parser.add_argument("--browser-max-pages", type=int, default=defaults.browser_max_pages)
     parser.add_argument("--claude-timeout-seconds", type=int, default=defaults.claude_timeout_seconds)
     args = parser.parse_args()
-    if args.poll_seconds < 1:
-        parser.error("--poll-seconds must be >= 1")
-    if args.browser_timeout_ms < 1000:
-        parser.error("--browser-timeout-ms must be >= 1000")
-    if args.browser_max_chars < 100:
-        parser.error("--browser-max-chars must be >= 100")
+    if not 1 <= args.poll_seconds <= 300:
+        parser.error("--poll-seconds must be between 1 and 300")
+    if not 1000 <= args.browser_timeout_ms <= 120000:
+        parser.error("--browser-timeout-ms must be between 1000 and 120000")
+    if not 500 <= args.browser_max_chars <= 50000:
+        parser.error("--browser-max-chars must be between 500 and 50000")
     if not 1 <= args.browser_max_pages <= 5:
         parser.error("--browser-max-pages must be between 1 and 5")
-    if args.claude_timeout_seconds < 1:
-        parser.error("--claude-timeout-seconds must be >= 1")
+    if not 10 <= args.claude_timeout_seconds <= 900:
+        parser.error("--claude-timeout-seconds must be between 10 and 900")
     try:
-        from scripts.db import init_db
+        from scripts.db import connect, init_db
         init_db()
-        while True:
-            worked = process_one(args.browser_timeout_ms, args.browser_max_chars,
-                                 args.claude_timeout_seconds, args.browser_max_pages)
-            if args.once:
-                return 0
-            if not worked:
-                time.sleep(args.poll_seconds)
+        # A session-scoped advisory lock prevents multiple memory-heavy workers.
+        with connect() as lock_conn:
+            lock = lock_conn.execute("SELECT pg_try_advisory_lock(71620261118) AS acquired").fetchone()
+            if not lock["acquired"]:
+                print("Another GovIntel worker already holds the local worker lock.")
+                return 3
+            try:
+                while True:
+                    worked = process_one(args.browser_timeout_ms, args.browser_max_chars,
+                                         args.claude_timeout_seconds, args.browser_max_pages)
+                    if args.once:
+                        return 0
+                    if not worked:
+                        time.sleep(args.poll_seconds)
+            finally:
+                lock_conn.execute("SELECT pg_advisory_unlock(71620261118)")
     except KeyboardInterrupt:
         print("Worker stopped; queued jobs remain persisted.")
         return 0
