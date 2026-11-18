@@ -139,14 +139,14 @@ def main(argv: list[str] | None = None) -> int:
                 checks = {
                     "database": conn.execute("SELECT 1").fetchone() is not None,
                     "stale_running_jobs": conn.execute(
-                        "SELECT COUNT(*) FROM research_jobs WHERE status='running' AND locked_at < NOW() - INTERVAL '15 minutes'"
-                    ).fetchone()[0],
+                        "SELECT COUNT(*) AS count FROM research_jobs WHERE status='running' AND locked_at < NOW() - INTERVAL '15 minutes'"
+                    ).fetchone()["count"],
                     "pending_reviews": conn.execute(
-                        "SELECT COUNT(*) FROM pitch_drafts WHERE review_status='pending'"
-                    ).fetchone()[0],
+                        "SELECT COUNT(*) AS count FROM pitch_drafts WHERE review_status='pending'"
+                    ).fetchone()["count"],
                     "failed_final_jobs": conn.execute(
-                        "SELECT COUNT(*) FROM research_jobs WHERE status='failed_final'"
-                    ).fetchone()[0],
+                        "SELECT COUNT(*) AS count FROM research_jobs WHERE status='failed_final'"
+                    ).fetchone()["count"],
                 }
             print(json.dumps({"runtime_config": config.__dict__, "checks": checks}, indent=2))
             return 0
