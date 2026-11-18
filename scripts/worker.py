@@ -14,6 +14,7 @@ from scripts.db import (
     get_approved_solutions, save_opportunity_analysis,
 )
 from scripts.research_browser import research_website
+from scripts.runtime_config import RuntimeConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 BANNED = ("revolutionize", "paradigm shift", "cutting-edge", "streamline", "next-gen", "digital transformation")
@@ -278,11 +279,15 @@ def main() -> int:
     load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(description="Run one bounded GovIntel worker")
     parser.add_argument("--once", action="store_true", help="Process at most one job")
-    parser.add_argument("--poll-seconds", type=int, default=int(os.getenv("WORKER_POLL_SECONDS", "5")))
-    parser.add_argument("--browser-timeout-ms", type=int, default=int(os.getenv("BROWSER_TIMEOUT_MS", "20000")))
-    parser.add_argument("--browser-max-chars", type=int, default=int(os.getenv("BROWSER_MAX_CHARS", "10000")))
-    parser.add_argument("--browser-max-pages", type=int, default=int(os.getenv("BROWSER_MAX_PAGES", "3")))
-    parser.add_argument("--claude-timeout-seconds", type=int, default=int(os.getenv("CLAUDE_TIMEOUT_SECONDS", "240")))
+    try:
+        defaults = RuntimeConfig.from_env()
+    except ValueError as exc:
+        parser.error(str(exc))
+    parser.add_argument("--poll-seconds", type=int, default=defaults.worker_poll_seconds)
+    parser.add_argument("--browser-timeout-ms", type=int, default=defaults.browser_timeout_ms)
+    parser.add_argument("--browser-max-chars", type=int, default=defaults.browser_max_chars)
+    parser.add_argument("--browser-max-pages", type=int, default=defaults.browser_max_pages)
+    parser.add_argument("--claude-timeout-seconds", type=int, default=defaults.claude_timeout_seconds)
     args = parser.parse_args()
     if args.poll_seconds < 1:
         parser.error("--poll-seconds must be >= 1")
