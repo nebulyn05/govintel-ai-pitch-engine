@@ -34,6 +34,6 @@ class RuntimeConfig:
             browser_timeout_ms=_integer("BROWSER_TIMEOUT_MS", 20_000, 1_000, 120_000),
             browser_max_chars=_integer("BROWSER_MAX_CHARS", 10_000, 500, 50_000),
             browser_max_pages=_integer("BROWSER_MAX_PAGES", 3, 1, 5),
-            usaspending_max_awards=_integer("USASPENDING_MAX_AWARDS", 5, 0, 10),
+            usaspending_max_awards=_integer("USASPENDING_MAX_AWARDS", 5, 1, 10),
             csv_max_rows=_integer("CSV_MAX_ROWS", 1_000, 1, 10_000),
         )
