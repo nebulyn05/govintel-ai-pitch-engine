@@ -10,6 +10,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from scripts.runtime_config import RuntimeConfig
+
 from scripts.db import (
     approve_solution, enqueue_lead, export_pitches, init_db, job_counts,
     list_solution_registry, reject_solution, sync_solution_registry,
@@ -45,7 +47,7 @@ def construct_local_pitch(row: dict, matrix: dict) -> tuple[str, str, str, str]:
     return "review_required", bottleneck, solution, pitch
 
 
-def _enqueue_csv(path: Path, campaign_id: str, max_attempts: int) -> tuple[int, int, list[str]]:
+def _enqueue_csv(path: Path, campaign_id: str, max_attempts: int, max_rows: int = 1000) -> tuple[int, int, list[str]]:
     created = existing = 0
     errors = []
     with path.open(encoding="utf-8-sig", newline="") as handle:
@@ -53,6 +55,8 @@ def _enqueue_csv(path: Path, campaign_id: str, max_attempts: int) -> tuple[int, 
         if not reader.fieldnames:
             raise ValueError("CSV has no header row.")
         for line, row in enumerate(reader, start=2):
+            if line - 1 > max_rows:
+                raise ValueError(f"CSV exceeds configured limit of {max_rows} data rows; split the file into smaller batches.")
             try:
                 _, new_job = enqueue_lead(row, campaign_id, max_attempts)
                 created += int(new_job)
@@ -72,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     enqueue.add_argument("--campaign-id", default=None)
     enqueue.add_argument("--max-attempts", type=int, default=None)
     sub.add_parser("status", help="Show durable job counts")
+    sub.add_parser("doctor", help="Check database connectivity and operational queue state")
     export = sub.add_parser("export", help="Export drafts for human review")
     export.add_argument("--output", type=Path, default=ROOT / "output_pitches.csv")
     export.add_argument("--campaign-id", default=None)
@@ -117,7 +122,8 @@ def main(argv: list[str] | None = None) -> int:
             if attempts < 1:
                 parser.error("--max-attempts must be >= 1")
             init_db()
-            created, existing, errors = _enqueue_csv(args.input, campaign, attempts)
+            config = RuntimeConfig.from_env()
+            created, existing, errors = _enqueue_csv(args.input, campaign, attempts, config.csv_max_rows)
             print(f"New jobs: {created}; existing leads updated: {existing}; row errors: {len(errors)}")
             for error in errors[:50]:
                 print(f"WARNING: {error}", file=sys.stderr)
@@ -125,6 +131,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "status":
             for name, count in sorted(job_counts().items()):
                 print(f"{name}: {count}")
+            return 0
+        if args.command == "doctor":
+            from scripts.db import connect
+            config = RuntimeConfig.from_env()
+            with connect() as conn:
+                checks = {
+                    "database": conn.execute("SELECT 1").fetchone() is not None,
+                    "stale_running_jobs": conn.execute(
+                        "SELECT COUNT(*) FROM research_jobs WHERE status='running' AND locked_at < NOW() - INTERVAL '15 minutes'"
+                    ).fetchone()[0],
+                    "pending_reviews": conn.execute(
+                        "SELECT COUNT(*) FROM pitch_drafts WHERE review_status='pending'"
+                    ).fetchone()[0],
+                    "failed_final_jobs": conn.execute(
+                        "SELECT COUNT(*) FROM research_jobs WHERE status='failed_final'"
+                    ).fetchone()[0],
+                }
+            print(json.dumps({"runtime_config": config.__dict__, "checks": checks}, indent=2))
             return 0
         if args.command == "export":
             campaign = args.campaign_id or os.getenv("CAMPAIGN_ID", "local")
