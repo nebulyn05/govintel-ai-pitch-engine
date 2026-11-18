@@ -167,3 +167,16 @@ Learning experiments compare stored baseline snapshots with later observational 
 ### Guarded self-improvement policy
 
 This batch adds measurement and experiment bookkeeping only. It does **not** edit or promote Claude skills, prompts, scoring weights, permissions, credentials, provider settings, spending limits or outreach rules. A `skill_change` experiment can only reach `awaiting_human_approval`; promotion and rollback require a separate, explicit human-controlled implementation and review. No learning result can authorize outreach or bypass the pitch-review gate.
+
+
+## Batch 7 — runtime validation and pilot operations
+
+Runtime limits are validated before the worker starts. Defaults keep execution serial and bounded for a small local machine: one worker process, three browser pages per lead, 10,000 characters per page, and five USAspending award results. A single enqueue command accepts at most 1,000 CSV data rows by default; reduce `CSV_MAX_ROWS` for smaller pilot batches. See [the Batch 7 pilot runbook](docs/BATCH_7_PILOT_RUNBOOK.md) for Kali setup, pilot execution, backup/restore, and safe shutdown.
+
+Run the operational preflight after starting PostgreSQL:
+
+```bash
+python -m scripts.orchestrator doctor
+```
+
+It checks database connectivity, stale running leases, pending human reviews, and terminally failed jobs. It does not contact leads or send outreach. The offline worker smoke test mocks external research, Claude and persistence boundaries; it is not a substitute for the live 10–20 lead pilot.
