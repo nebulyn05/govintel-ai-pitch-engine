@@ -152,7 +152,7 @@ def save_evidence(lead: dict, job_id: int, item: dict) -> None:
         conn.execute(
             """INSERT INTO evidence_items(company_id,lead_id,research_job_id,source_url,source_title,
                excerpt,evidence_type,content_hash,metadata)
-               VALUES (%s,%s,%s,%s,%s,'source_metadata',%s,%s)
+               VALUES (%s,%s,%s,%s,%s,%s,'source_metadata',%s,%s)
                ON CONFLICT(lead_id,source_url,content_hash) DO NOTHING""",
             (lead["company_id"],lead["id"],job_id,url,str(item.get("title") or "")[:500],
              excerpt,digest,Jsonb(item.get("metadata") or {})),
@@ -215,3 +215,142 @@ def export_pitches(output_path: str, campaign_id: str = "local") -> int:
     with open(output_path,"w",encoding="utf-8",newline="") as handle:
         writer=csv.DictWriter(handle,fieldnames=fields); writer.writeheader(); writer.writerows(rows)
     return len(rows)
+
+
+def get_approved_solutions() -> list[dict]:
+    """Return only human-approved, non-restricted registry entries."""
+    with connect() as conn:
+        return conn.execute(
+            """SELECT DISTINCT ON (solution_key) id,solution_key,version,title,description,delivery_status,
+                      approved_claims,requirements,status
+               FROM solution_registry
+               WHERE status='approved' AND delivery_status IN ('available','buildable','partner_required')
+               ORDER BY solution_key,version DESC,reviewed_at DESC"""
+        ).fetchall()
+
+
+def list_solution_registry() -> list[dict]:
+    with connect() as conn:
+        return conn.execute(
+            """SELECT id,solution_key,version,title,delivery_status,status,
+                      jsonb_array_length(approved_claims) AS approved_claim_count,
+                      reviewed_by,reviewed_at
+               FROM solution_registry ORDER BY solution_key,version"""
+        ).fetchall()
+
+
+def sync_solution_registry(seed_path: str) -> tuple[int, int]:
+    """Insert/update seed entries only while they remain unapproved candidates."""
+    import json
+    from pathlib import Path
+    rows = json.loads(Path(seed_path).read_text(encoding="utf-8"))
+    if not isinstance(rows, list):
+        raise ValueError("Solution registry seed must be a JSON array.")
+    inserted_or_updated = skipped = 0
+    with connect() as conn:
+        for row in rows:
+            required = ("solution_key", "version", "title", "description", "delivery_status", "requirements")
+            if not isinstance(row, dict) or any(not row.get(key) for key in required):
+                raise ValueError("Every registry seed entry needs key, version, title, description, delivery_status and requirements.")
+            if row["delivery_status"] not in {"available", "buildable", "partner_required", "concept", "restricted"}:
+                raise ValueError(f"Invalid delivery status for {row['solution_key']}.")
+            result = conn.execute(
+                """INSERT INTO solution_registry(solution_key,version,title,description,delivery_status,
+                       approved_claims,requirements,status)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,'candidate')
+                   ON CONFLICT(solution_key,version) DO UPDATE SET
+                       title=EXCLUDED.title,description=EXCLUDED.description,
+                       delivery_status=EXCLUDED.delivery_status,approved_claims=EXCLUDED.approved_claims,
+                       requirements=EXCLUDED.requirements
+                   WHERE solution_registry.status='candidate'
+                   RETURNING id""",
+                (row["solution_key"], int(row["version"]), row["title"], row["description"],
+                 row["delivery_status"], Jsonb(row.get("approved_claims") or []),
+                 Jsonb(row["requirements"])),
+            ).fetchone()
+            if result:
+                inserted_or_updated += 1
+            else:
+                skipped += 1
+    return inserted_or_updated, skipped
+
+
+def approve_solution(solution_key: str, version: int, reviewer: str) -> None:
+    if not reviewer.strip():
+        raise ValueError("A reviewer identity is required.")
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT id,delivery_status,approved_claims,requirements,status
+               FROM solution_registry WHERE solution_key=%s AND version=%s FOR UPDATE""",
+            (solution_key, version),
+        ).fetchone()
+        if not row:
+            raise ValueError("Solution registry entry not found.")
+        if row["status"] != "candidate":
+            raise ValueError("Only candidate registry entries can be approved.")
+        if row["delivery_status"] not in {"available", "buildable", "partner_required"}:
+            raise ValueError("Only available, buildable or partner-required solutions can be approved for matching.")
+        claims = row["approved_claims"] or []
+        requirements = row["requirements"] or {}
+        if not claims or not all(isinstance(item, str) and item.strip() for item in claims):
+            raise ValueError("Add explicit approved_claims before approving this solution.")
+        if not isinstance(requirements.get("capability_tags"), list) or not requirements["capability_tags"]:
+            raise ValueError("Add capability_tags before approving this solution.")
+        prerequisites = requirements.get("prerequisites")
+        if not isinstance(prerequisites, list) or not prerequisites or not all(isinstance(value, str) and value.strip() for value in prerequisites):
+            raise ValueError("Document prerequisites before approving this solution.")
+        conn.execute(
+            """UPDATE solution_registry SET status='approved',reviewed_by=%s,reviewed_at=NOW()
+               WHERE id=%s""",
+            (reviewer.strip(), row["id"]),
+        )
+
+
+def reject_solution(solution_key: str, version: int, reviewer: str) -> None:
+    if not reviewer.strip():
+        raise ValueError("A reviewer identity is required.")
+    with connect() as conn:
+        result = conn.execute(
+            """UPDATE solution_registry SET status='rejected',reviewed_by=%s,reviewed_at=NOW()
+               WHERE solution_key=%s AND version=%s AND status='candidate' RETURNING id""",
+            (reviewer.strip(), solution_key, version),
+        ).fetchone()
+        if not result:
+            raise ValueError("Candidate solution not found or no longer reviewable.")
+
+
+def save_opportunity_analysis(lead: dict, job_id: int, opportunities: list[dict]) -> int:
+    saved = 0
+    with connect() as conn:
+        for item in opportunities:
+            row = conn.execute(
+                """INSERT INTO opportunities(company_id,lead_id,research_job_id,title,description,
+                       evidence_type,confidence,status,impact,urgency,evidence_score,impact_score,
+                       urgency_score,feasibility_score,priority_score,evidence_claim_indices,
+                       capability_tags,buyer_role,review_status,evidence_quality,scoring_version)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,'candidate',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   RETURNING id""",
+                (lead["company_id"], lead["id"], job_id, item["title"], item["description"],
+                 item["evidence_type"], item["confidence"], item["impact"], item["urgency"],
+                 item["evidence_score"], item["impact_score"], item["urgency_score"],
+                 item["feasibility_score"], item["priority_score"],
+                 Jsonb(item["evidence_claim_indices"]), Jsonb(item["capability_tags"]),
+                 item["buyer_role"], item["review_status"], Jsonb(item.get("evidence_quality") or {}),
+                 item.get("scoring_version", "1.0")),
+            ).fetchone()
+            opportunity_id = row["id"]
+            for match in item["solution_matches"]:
+                conn.execute(
+                    """INSERT INTO solution_candidates(company_id,lead_id,opportunity_id,title,
+                           description,delivery_status,feasibility_notes,solution_registry_id,
+                           match_score,match_metadata,review_status)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'candidate')""",
+                    (lead["company_id"], lead["id"], opportunity_id, match["title"],
+                     match["description"], match["delivery_status"],
+                     "Prerequisites: " + "; ".join(match["prerequisites"]),
+                     match["registry_id"], match["match_score"],
+                     Jsonb({key: value for key, value in match.items()
+                            if key not in {"title", "description"}})),
+                )
+            saved += 1
+    return saved

@@ -29,3 +29,23 @@ Use the DBS framework: Direction defines goals and guardrails, Blueprints define
 - Skill changes must be versioned and evaluated. Only predefined low-risk changes may be auto-promoted after regression checks.
 - Changes to security, permissions, evidence standards, credentials, spending, paid providers, system instructions, or outreach authorization require human approval.
 - Track research quality separately from commercial outcomes.
+
+
+## Opportunity scoring and solution governance
+- Extract opportunities as structured records linked to claim indices; never create an opportunity without explicit supporting claims.
+- Keep evidence strength separate from impact, urgency and solution feasibility. Industry hypotheses are capped and must not be ranked as company-verified opportunities.
+- Use only solution registry entries with status=approved for matching or pitch recommendations.
+- Candidate, rejected, concept and restricted solutions are not pitchable. Registry approval requires a human reviewer, explicit approved claims, capability tags and documented prerequisites.
+- A solution match is not proof that the customer needs it. Record prerequisites and unresolved integration requirements.
+- Keep priority scores explainable and deterministic; never use a model-generated score as the sole reason to contact a prospect.
+- Preserve the human review gate for opportunities, solution fit and all outreach drafts.
+
+
+## Evidence scoring and guarded learning
+- Score evidence quality separately from estimated impact, urgency and solution feasibility.
+- Record source counts and distinct source domains; deduplicate repeated URLs and use corroboration only as a bounded bonus.
+- A URL attached to an industry hypothesis does not make that hypothesis company-specific evidence.
+- Keep scoring versions and component breakdowns auditable. A priority score is for review triage, never an automatic contact or rejection decision.
+- Report research-quality signals separately from commercial outcomes. Commercial outcomes must be explicitly recorded by an operator and must not be inferred from draft approval.
+- Treat before/after experiment reports as observational, not causal proof. Record sample sizes and known limitations.
+- Learning experiments may recommend changes but cannot alter skills, prompts, permissions, credentials, spending, provider configuration or outreach rules. Skill changes require explicit human review and controlled regression testing; no automatic promotion is permitted by this workflow.
