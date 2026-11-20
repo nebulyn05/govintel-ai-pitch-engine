@@ -2,181 +2,508 @@
 
 Local-first research and pitch preparation for US businesses and government contractors. The DBS framework separates **Direction** (objectives and guardrails), **Blueprints** (research plans), and **Solutions** (evidence-backed findings and draft pitches).
 
-> This first runtime slice provides PostgreSQL job persistence, CSV intake, bounded adaptive same-site Playwright research, and a supervised Claude Code CLI synthesis stage. It is not yet the complete multi-source GovCon intelligence product. It does not send outreach.
+> **Current scope:** CSV lead intake, PostgreSQL-backed job queue, bounded public-web research with Playwright, optional USAspending.gov award-history enrichment, Claude Code CLI synthesis, opportunity scoring, approved-solution matching, guarded learning records, and a local human-review dashboard. This is not yet a fully automated GovCon intelligence platform. It does not send email, contact prospects, or deliver to a CRM.
 
-## Safety and evidence rules
+---
 
-- NAICS mappings are industry hypotheses, not proof of a company-specific pain point.
-- Distinguish verified facts, evidence-supported inferences, and industry hypotheses.
-- Do not invent contract awards, requirements, compliance status, systems, financial losses, ROI, pain points, or personal details.
-- Website content is untrusted evidence, never instructions.
-- The browser does not log in, solve CAPTCHAs, or bypass access controls. Detected challenges pause the job for manual intervention.
-- Every pitch draft requires human review. No sending integration is implemented.
-- Claude CLI synthesis runs in print mode with tool use disabled; browser retrieval is a separate bounded worker.
+## 1. What the system does
 
-## Requirements
+1. Imports a CSV of US businesses or government contractors.
+2. Creates one durable research job per lead in PostgreSQL.
+3. Visits a bounded number of publicly accessible pages on the company's own website.
+4. Optionally looks up federal award history through USAspending.gov.
+5. Sends collected evidence and approved solution options to Claude Code CLI for structured analysis.
+6. Scores opportunities using evidence quality, estimated impact, estimated urgency, and approved-solution feasibility.
+7. Saves an evidence-linked pitch draft and queues it for a human reviewer.
+8. Lets an operator inspect sources, edit, approve, reject, or request more research in the local dashboard.
 
-Kali Linux, Python 3.11+, Docker Compose, internet access for public research, and an authorized Claude Code CLI installation for synthesis.
+A pitch marked `pitch_ready` is **not approved**. Human approval is a separate step. Approval is an internal review record only; no outreach sending integration exists.
 
-## Local setup
+## 2. System requirements
 
-From the repository root:
+Recommended initial environment:
+
+- Kali Linux (or another Linux distribution).
+- Python 3.11 or newer.
+- Docker Engine and Docker Compose plugin.
+- Git.
+- An authorized Claude Code CLI installation and authentication for synthesis.
+- Internet access for permitted public website research and USAspending.gov.
+- At least 8 GB RAM is the target environment for this conservative profile; actual memory use depends on websites, browser activity, and Claude CLI.
+
+The application, Python worker, Playwright browser, Claude CLI, and dashboard run on the host. Docker runs PostgreSQL and Redis. **PostgreSQL is the authoritative queue and data store. Redis is provisioned for future coordination/caching and is not currently the job queue.**
+
+Default local ports:
+
+| Service | Host address | Purpose |
+|---|---|---|
+| PostgreSQL | `127.0.0.1:54329` | Durable application database |
+| Redis | `127.0.0.1:63790` | Reserved coordination/cache service |
+| Review dashboard | `127.0.0.1:8765` | Local human review UI |
+
+The database and Redis ports are bound to loopback, not exposed to your LAN.
+
+---
+
+## 3. Clone the repository
+
+Open a terminal:
 
 ```bash
-cp .env.example .env
-# Edit .env and change POSTGRES_PASSWORD and DATABASE_URL to use the same local password.
-docker compose up -d
-docker compose ps
+git clone https://github.com/nebulyn05/govintel-ai-pitch-engine.git
+cd govintel-ai-pitch-engine
+```
 
+For the current Batch 7 implementation, check out its feature branch:
+
+```bash
+git fetch origin
+git checkout feat/batch-7-integration-validation
+```
+
+If you are setting up from a later merged release, use the appropriate released/default branch instead.
+
+---
+
+## 4. Prepare Python
+
+Check your Python version:
+
+```bash
+python3 --version
+```
+
+Create and activate a virtual environment:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+Upgrade pip and install the project and test dependencies:
+
+```bash
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
-python -m playwright install chromium
-python -m scripts.orchestrator init-db
+```
 
-# Install/authenticate Claude Code CLI using the current official instructions.
+Install the Playwright Chromium browser:
+
+```bash
+python -m playwright install chromium
+```
+
+If Playwright reports missing Linux shared libraries, use its supported dependency installer:
+
+```bash
+python -m playwright install-deps chromium
+```
+
+On Kali, this may request administrator privileges to install operating-system packages. Do not run the application itself as root unless you have a specific reason.
+
+---
+
+## 5. Install and authenticate Claude Code CLI
+
+Claude Code CLI is used for structured analysis and pitch synthesis. Install it using Anthropic's current official installation instructions; the installation method and supported flags can change.
+
+Verify the command is available:
+
+```bash
 claude --version
 ```
 
-Ports bind to loopback only. Do not use the example password on a shared or exposed machine. The application, Playwright and Claude CLI run on the host; PostgreSQL and Redis run in containers. PostgreSQL is authoritative for job state; Redis is provisioned for future coordination/caching and is not yet the job queue.
-
-## Queue and process a pilot
-
-Start with 10–20 leads before a larger batch. CSV columns can include `Legal Business Name`, `Website`, `NAICS Code`, `City`, `State`, `UEI`, `POC Name`, `POC Title`, `POC Email`, and `POC Phone`.
+Start Claude interactively and complete authentication:
 
 ```bash
-python -m scripts.orchestrator enqueue --input leads.csv --campaign-id pilot
-python -m scripts.orchestrator status
-
-# Process at most one job:
-python -m scripts.worker --once
-
-# Optional research budget (default 3 pages, maximum 5):
-# python -m scripts.worker --once --browser-max-pages 3
-
-# Run one bounded worker loop:
-python -m scripts.worker
-
-# After an operator has handled a CAPTCHA/access challenge, resume that job:
-python -m scripts.resume_job --job-id 123
-
-# Export saved drafts for human review:
-python -m scripts.orchestrator export --output output_pitches.csv --campaign-id pilot
-pytest -q
+claude
 ```
 
-You can enqueue 1,000 leads, but do not launch 1,000 processes. The initial worker processes one lead at a time. Failed tasks have bounded retries; job state survives process restarts. Exported drafts are not approved outreach.
+Then exit the interactive session. Confirm that the same Linux user who will run the GovIntel worker can invoke the CLI. The worker uses the configured command name (default: `claude`) and a bounded timeout.
 
-## Opportunity discovery and solution registry
+Do not place API keys or authentication tokens in the CSV, source code, or Git. Do not assume that an interactive login guarantees unattended operation: test a single lead first and confirm that your Claude account, CLI version, and usage terms support the intended non-interactive invocation.
 
-The research worker converts Claude's structured opportunity hypotheses into deterministic, explainable priority scores. Each opportunity must reference claim indices from the lead's evidence. Scoring uses 40% evidence strength, 20% estimated impact, 20% estimated urgency and 20% approved-solution feasibility. If there is no company-specific source-backed claim, the priority score is capped at 35/100 and routed for more evidence. Impact and urgency are model estimates, not verified facts; the score is a triage aid, never an automatic contact decision.
+---
 
-The solution registry starts with candidate templates in `references/solution_registry.json`. Candidate entries are not offerings and are never recommended as approved solutions. Review and edit their delivery status, prerequisites, capability tags and explicit approved claims before approving one:
+## 6. Configure environment variables
+
+Create your local environment file:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+At minimum, change the example database password. The password in `POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` **must match**.
+
+Example:
+
+```dotenv
+ENVIRONMENT=local
+POSTGRES_PASSWORD=replace-with-a-long-local-password
+DATABASE_URL=postgresql://govintel:replace-with-a-long-local-password@127.0.0.1:54329/govintel
+REDIS_URL=redis://127.0.0.1:63790/0
+CAMPAIGN_ID=local
+CLAUDE_COMMAND=claude
+CLAUDE_TIMEOUT_SECONDS=240
+WORKER_POLL_SECONDS=5
+JOB_MAX_ATTEMPTS=3
+BROWSER_TIMEOUT_MS=20000
+BROWSER_MAX_CHARS=10000
+BROWSER_MAX_PAGES=3
+GOVINTEL_DATA_DIR=./data
+USASPENDING_ENABLED=true
+USASPENDING_MAX_AWARDS=5
+CSV_MAX_ROWS=1000
+```
+
+The repository's `.env.example` already contains these settings; this is an illustration of the important values, not a replacement for checking your local file.
+
+### Resource settings
+
+Batch 7 validates the following values and rejects values outside the supported bounds:
+
+| Variable | Default | Allowed range |
+|---|---:|---:|
+| `WORKER_POLL_SECONDS` | 5 | 1–300 |
+| `CLAUDE_TIMEOUT_SECONDS` | 240 | 10–900 |
+| `BROWSER_TIMEOUT_MS` | 20,000 | 1,000–120,000 |
+| `BROWSER_MAX_CHARS` | 10,000 | 500–50,000 |
+| `BROWSER_MAX_PAGES` | 3 | 1–5 |
+| `USASPENDING_MAX_AWARDS` | 5 | 1–10 |
+| `CSV_MAX_ROWS` | 1,000 | 1–10,000 |
+
+For a machine with 8 GB RAM or less, start with the defaults, run only one worker process, and keep the browser page budget at three or lower. These are conservative controls, **not measured RAM guarantees or performance benchmarks**.
+
+The worker also takes a PostgreSQL advisory lock. If another GovIntel worker already holds that lock, a second worker exits rather than multiplying browser/Claude memory consumption.
+
+The `.env` file is ignored by Git. Keep it private and never commit it.
+
+---
+
+## 7. Start PostgreSQL and Redis
+
+From the repository root, with Docker running:
+
+```bash
+docker compose up -d postgres redis
+docker compose ps
+```
+
+Wait until both containers report healthy. If a service does not become healthy, inspect its logs:
+
+```bash
+docker compose logs --tail=100 postgres
+docker compose logs --tail=100 redis
+```
+
+The Compose file uses persistent Docker volumes, so stopping containers does not normally delete the database.
+
+---
+
+## 8. Initialize the database and run preflight checks
+
+With the Python virtual environment active:
+
+```bash
+python -m scripts.orchestrator init-db
+python -m scripts.orchestrator doctor
+```
+
+The first command creates or updates the PostgreSQL schema. The schema uses additive, idempotent table/column/index creation patterns.
+
+The `doctor` command checks database connectivity and reports:
+
+- Stale jobs still marked as running for more than 15 minutes.
+- Pitch drafts awaiting human review.
+- Jobs that reached terminal failure.
+- The active validated runtime configuration.
+
+A stale-job count is an operational warning to investigate, not a reason to delete rows manually. Batch 1 includes expired-lease recovery in the worker path.
+
+---
+
+## 9. Configure the approved solution registry
+
+The repository seeds **candidate templates only**. They are not automatically approved offerings, and they do not represent a promise that your business can deliver them.
+
+Sync the candidate registry and inspect it:
 
 ```bash
 python -m scripts.orchestrator registry-sync
 python -m scripts.orchestrator registry-list
-# Edit references/solution_registry.json to document actual delivery readiness and approved claims.
-python -m scripts.orchestrator registry-sync
-python -m scripts.orchestrator registry-approve --key private_document_assistant --version 1 --reviewer "Operator ID"
 ```
 
-Only registry entries with status `approved` and delivery status `available`, `buildable` or `partner_required` can be matched. The approval command refuses entries without approved claims, capability tags and documented prerequisites. Approved/rejected entries are not overwritten by a later seed sync. Revoke or revise an approved offering by creating and reviewing a new version; do not silently edit approved claims.
+Open `references/solution_registry.json` and review each solution you genuinely intend to offer. Before approving an entry:
 
-## Job outcomes
+1. Set its delivery status to an honest value: `available`, `buildable`, or `partner_required`. Do not leave it as `concept`.
+2. Add only capability tags that describe work you can actually perform.
+3. Document prerequisites and integration constraints.
+4. Add explicit, supportable `approved_claims`; do not add unverified performance, savings, compliance, or customer-result claims.
+5. Check any sector and NAICS restrictions.
 
-Jobs move through `queued`, `running`, and `completed`, or wait in `awaiting_manual_intervention` / fail in `failed_retryable` or `failed_final`. A completed job produces a draft outcome: `pitch_ready`, `needs_further_research`, or `do_not_pursue`. Pitch-ready is not human approval.
+Run registry sync again after editing the seed file:
 
-## Memory and isolation
+```bash
+python -m scripts.orchestrator registry-sync
+python -m scripts.orchestrator registry-list
+```
 
-PostgreSQL separates companies, campaign leads, jobs, evidence, pitch drafts, outcomes, skill versions, learning experiments, and solution registry records. Evidence is tied to a company and lead. Browser contexts are fresh and non-persistent. Keep real lead data, secrets, browser profiles and generated output out of Git. Before multi-tenant hosting, implement and test tenant authorization and row-level access enforcement.
+Then approve only the reviewed solution key/version, using a real reviewer identity. For example, after you have genuinely completed the review and edited that entry:
 
-## Tests
+```bash
+python -m scripts.orchestrator registry-approve --key private_document_assistant --version 1 --reviewer "Your reviewer ID"
+```
+
+The example key is **not ready to approve in the untouched seed file**: the shipped template is marked `concept` and has no approved claims. Edit and validate it first. The approval command enforces the required claims, tags, prerequisites, and delivery status.
+
+List the registry again and confirm the intended entry is approved. Only the latest approved, eligible registry version can be matched to an opportunity.
+
+---
+
+## 10. Prepare your lead CSV
+
+Create a CSV file, for example `pilot.csv`, with a header row. Supported fields include:
+
+```csv
+Legal Business Name,Website,NAICS Code,City,State,UEI,POC Name,POC Title,POC Email,POC Phone
+Example Federal Services,https://example.com,541512,Austin,TX,,Jordan Smith,Operations Director,,
+```
+
+Use official company websites and accurate legal business names. UEI is strongly recommended for government-contractor award matching. Do not invent contact details or include sensitive personal information that is not necessary for the research.
+
+Important:
+
+- The CSV must have a header row.
+- Use the supported column names shown above.
+- Website URLs must be valid public HTTP/HTTPS URLs.
+- Start with 10–20 representative leads, not 1,000.
+- A single enqueue command is limited by `CSV_MAX_ROWS` (default 1,000). Split larger files into batches.
+- Duplicate company/campaign entries are handled by the database's uniqueness rules; review the enqueue summary and row warnings.
+
+---
+
+## 11. Enqueue the pilot leads
+
+With the database running and `.env` configured:
+
+```bash
+python -m scripts.orchestrator enqueue --input pilot.csv --campaign-id pilot-001
+```
+
+The command reports new jobs, existing leads, and row errors. A non-zero exit code indicates that one or more rows were rejected; read the warnings and correct the CSV before proceeding.
+
+Check the queue:
+
+```bash
+python -m scripts.orchestrator status
+```
+
+Enqueueing does not browse websites, contact prospects, send messages, or approve pitches. It only persists lead and job records.
+
+---
+
+## 12. Run the research worker
+
+Keep only one worker process running for this local low-memory profile.
+
+For a controlled test, process one job:
+
+```bash
+python -m scripts.worker --once
+```
+
+Run the command again to process another queued job. This is useful for watching the first few leads and inspecting logs.
+
+When ready to let the queue run continuously:
+
+```bash
+python -m scripts.worker
+```
+
+Stop it with `Ctrl+C`. Queued jobs remain in PostgreSQL and can be resumed later.
+
+The worker performs bounded same-site public research, optional USAspending enrichment, Claude synthesis, opportunity scoring, solution matching, and pitch persistence. It does not log in to websites, bypass CAPTCHAs, or circumvent access controls. A detected challenge may pause a job for manual intervention.
+
+After an authorized operator has handled the website challenge, resume the job using its actual job ID:
+
+```bash
+python -m scripts.resume_job --job-id 123
+```
+
+Do not resume a job until the required manual intervention has been completed. The job returns to the normal permitted research path.
+
+Monitor progress:
+
+```bash
+python -m scripts.orchestrator status
+python -m scripts.orchestrator doctor
+```
+
+---
+
+## 13. Review drafts in the local dashboard
+
+Start the dashboard in a second terminal, with the virtual environment active:
+
+```bash
+source .venv/bin/activate
+python -m scripts.review_dashboard
+```
+
+Open this address on the same computer:
+
+**http://127.0.0.1:8765**
+
+The dashboard shows pending drafts, company context, claims, evidence URLs, captured excerpts, opportunity scores, and solution-match information.
+
+For each draft:
+
+1. Open the company record.
+2. Inspect the original evidence and source URLs.
+3. Check that each claim is supported by the cited source.
+4. Check whether the opportunity is a verified fact, evidence-supported inference, or industry hypothesis.
+5. Review the selected solution, prerequisites, and delivery readiness.
+6. Choose **Approve**, **Edit**, **Reject**, or **Request further research**.
+7. Supply your reviewer identity and meaningful review notes.
+
+An edit remains pending and must be approved separately. Approval is blocked unless the draft is pitch-ready, has source-backed claims, and is linked to a currently approved/matchable solution. Review actions are written to the audit trail.
+
+The dashboard binds to loopback only. Do not expose port 8765 to your LAN or the public internet. The dashboard is a local review interface, not a secure multi-user/tenant service.
+
+---
+
+## 14. Export drafts for further review
+
+You can export saved drafts to a CSV file:
+
+```bash
+python -m scripts.orchestrator export --output output_pitches.csv --campaign-id pilot-001
+```
+
+Treat the export as internal working material. A generated draft or exported row is not automatically approved outreach. Keep generated files and lead data out of Git.
+
+---
+
+## 15. Run tests and inspect learning metrics
+
+Install development dependencies as described in Step 4, then run:
 
 ```bash
 pytest -q
 ```
 
-## Backup and migration
+The offline smoke tests mock external research, Claude, and persistence boundaries. They do not replace a live integration test against PostgreSQL, real websites, and an authenticated Claude CLI.
 
-Back up PostgreSQL and any local evidence/workspace files separately, and test restore. Keep data outside disposable containers. Stop workers before migration, back up and restore the database, verify row counts, then resume queued jobs.
-
-## Current limitations
-
-- Browser research now visits a bounded set of relevant same-site pages (homepage plus selected careers/jobs, contact/intake, capabilities/services or about pages). It does not crawl arbitrary external links.
-- CMS, analytics, technology, copyright-year and thin-content observations are weak signals only; they do not prove pain points or justify automatic lead rejection.
-- USAspending.gov is a public, unauthenticated source. Enrichment is bounded to at most 10 award results per lead and can be disabled with `USASPENDING_ENABLED=false`. Supply a `UEI` column in the lead CSV for the strongest identity match. Without UEI, exact legal-name and location corroboration are required; otherwise awards remain unattached.
-- JavaScript is disabled during retrieval. Some JavaScript-rendered sites may therefore return partial evidence. The page budget defaults to three and can be raised to five; keep it low on machines with limited RAM.
-- USAspending.gov public award-history lookup is integrated for a bounded set of recent/high-value federal prime awards. It searches by supplied UEI first; without UEI it requires exact normalized legal-name plus city/state corroboration. Name-only matches are never attached to a lead. Award records are context, not proof of current pain, budget, or buying intent. SAM.gov integration is not implemented.
-- No outreach sending is implemented.
-- The solution registry ships with candidate templates only; it contains no human-approved live offerings until an operator completes the review and approval workflow.
-- Skill self-improvement has schema scaffolding only; automatic promotion is not implemented.
-- Validate the installed Claude CLI's supported flags, authentication and unattended-use terms before a large batch.
-
-
-## Local human-review dashboard (Batch 5)
-
-Start the dashboard after the database is configured:
+Useful operational and research commands:
 
 ```bash
-python -m scripts.review_dashboard
-# Open http://127.0.0.1:8765 on the same machine
-```
+# Queue and operational health
+python -m scripts.orchestrator status
+python -m scripts.orchestrator doctor
 
-The dashboard binds to loopback only and uses no additional Python web framework. It displays the latest pending drafts, company context, claims and source URLs, captured evidence, opportunity scores and solution-match prerequisites. Review actions are **Approve**, **Edit**, **Reject**, and **Request further research**. Reviewer identity, timestamp, notes and action are written to the pitch record and the `outcomes` audit table. Edits remain pending until separately approved.
+# Highest-priority opportunities
+python -m scripts.orchestrator priority-list --limit 20
 
-Approval is blocked unless the draft is `pitch_ready`, its quality checks and claim list include source-backed evidence, a proposed solution exists, and a currently approved/matchable solution registry record is linked to one of the lead's opportunities. The dashboard does not send email, call a CRM, or authorize outreach. Treat approval as an internal draft-review decision only.
-
-Keep this service on the local machine. It intentionally refuses non-loopback bind addresses. Do not expose the review port to a LAN or the public internet.
-
-
-## Evidence prioritization and guarded learning (Batch 6)
-
-Opportunity evidence scoring is versioned (`2.0`) and records its components: claim count, confidence, source count, distinct source domains and a bounded corroboration bonus. Verified facts and evidence-supported inferences receive stronger evidence weights than industry hypotheses. A URL attached to an industry hypothesis does not turn it into company-specific evidence. The existing priority formula remains explainable: 40% evidence quality, 20% estimated impact, 20% estimated urgency and 20% approved-solution feasibility. Without company-specific source-backed evidence, the score remains capped at 35/100.
-
-The review queue is ordered by highest opportunity priority and evidence score, not simply by newest draft. The CLI can show the same ranked lead queue:
-
-```bash
-python -m scripts.orchestrator priority-list --limit 50
-```
-
-### Separate research quality from commercial outcomes
-
-```bash
-# Show two separate metric groups
+# Separate research-quality metrics from manually recorded commercial outcomes
 python -m scripts.orchestrator learning-report
-
-# Record a manually observed commercial outcome for a reviewed draft
-python -m scripts.orchestrator outcome-record --draft-id 123 \
-  --type commercial_meeting --recorded-by "Operator ID" --notes "Introductory call held"
-
-# Propose an observational research-quality experiment
-python -m scripts.orchestrator learning-propose --type research_quality \
-  --hypothesis "Adding a second official source should improve evidence completeness"
-
-# Evaluate a proposed experiment against a fresh snapshot
-python -m scripts.orchestrator learning-evaluate --id 1
 python -m scripts.orchestrator learning-list
 ```
 
-Supported commercial outcome types are `commercial_reply`, `commercial_meeting`, `commercial_won`, `commercial_lost`, and `commercial_no_response`. These are manually recorded observations; the system does not infer a sale or reply from a pitch approval.
-
-Learning experiments compare stored baseline snapshots with later observational snapshots. They report numeric deltas but explicitly do not claim causation. Research-quality metrics (source-backed drafts, evidence gaps, reviewer decisions and evidence scores) are reported separately from commercial outcomes (replies, meetings, wins, losses and no response).
-
-### Guarded self-improvement policy
-
-This batch adds measurement and experiment bookkeeping only. It does **not** edit or promote Claude skills, prompts, scoring weights, permissions, credentials, provider settings, spending limits or outreach rules. A `skill_change` experiment can only reach `awaiting_human_approval`; promotion and rollback require a separate, explicit human-controlled implementation and review. No learning result can authorize outreach or bypass the pitch-review gate.
-
-
-## Batch 7 — runtime validation and pilot operations
-
-Runtime limits are validated before the worker starts. Defaults keep execution serial and bounded for a small local machine: one worker process, three browser pages per lead, 10,000 characters per page, and five USAspending award results. A single enqueue command accepts at most 1,000 CSV data rows by default; reduce `CSV_MAX_ROWS` for smaller pilot batches. See [the Batch 7 pilot runbook](docs/BATCH_7_PILOT_RUNBOOK.md) for Kali setup, pilot execution, backup/restore, and safe shutdown.
-
-Run the operational preflight after starting PostgreSQL:
+Commercial outcomes are manually recorded observations. For example:
 
 ```bash
-python -m scripts.orchestrator doctor
+python -m scripts.orchestrator outcome-record --draft-id 123 \
+  --type commercial_meeting --recorded-by "Operator ID" \
+  --notes "Introductory call held"
 ```
 
-It checks database connectivity, stale running leases, pending human reviews, and terminally failed jobs. It does not contact leads or send outreach. The offline worker smoke test mocks external research, Claude and persistence boundaries; it is not a substitute for the live 10–20 lead pilot.
+Supported types are `commercial_reply`, `commercial_meeting`, `commercial_won`, `commercial_lost`, and `commercial_no_response`.
+
+An observational research-quality experiment can be proposed and evaluated:
+
+```bash
+python -m scripts.orchestrator learning-propose --type research_quality \
+  --hypothesis "Adding another official source may improve evidence completeness"
+python -m scripts.orchestrator learning-evaluate --id 1
+```
+
+Use the actual experiment ID returned by the propose command. Learning snapshots report observed differences; they do not establish causation. The learning system does not automatically modify prompts, skills, scoring weights, permissions, spending limits, or outreach rules.
+
+---
+
+## 16. Backup, restore, and shutdown
+
+### Back up PostgreSQL
+
+```bash
+docker compose exec -T postgres pg_dump -U govintel govintel > govintel-backup.sql
+```
+
+Check that the backup file exists and is non-empty. Store it securely; it may contain business and contact data.
+
+### Restore PostgreSQL
+
+Stop the worker first. Restore only into the intended database:
+
+```bash
+cat govintel-backup.sql | docker compose exec -T postgres psql -U govintel -d govintel
+```
+
+This command applies the dump to the selected database; it is not a clean-database reset procedure. Test backup restoration in a separate database/environment before depending on it.
+
+### Stop services
+
+Stop the worker and dashboard with `Ctrl+C`, then stop the containers:
+
+```bash
+docker compose down
+```
+
+This preserves named volumes. **Do not** use `docker compose down -v` unless you deliberately intend to delete the PostgreSQL and Redis volumes and all data stored in them.
+
+---
+
+## 17. Recommended first pilot checklist
+
+- [ ] Confirm Python, Docker Compose, Playwright Chromium, and Claude CLI are installed.
+- [ ] Authenticate Claude CLI as the same user who will run the worker.
+- [ ] Set a private database password in both `POSTGRES_PASSWORD` and `DATABASE_URL`.
+- [ ] Start PostgreSQL and Redis and wait for healthy status.
+- [ ] Run database initialization and `doctor`.
+- [ ] Review and explicitly approve only real, deliverable solution registry entries.
+- [ ] Prepare 10–20 accurate leads with official websites and UEIs where available.
+- [ ] Enqueue the pilot and inspect row warnings.
+- [ ] Process the first one or two jobs with `--once` before starting the continuous worker.
+- [ ] Review every pitch and evidence source in the local dashboard.
+- [ ] Confirm no outreach is sent; there is no sending integration.
+- [ ] Record failures, processing time, memory usage, evidence gaps, and review decisions before increasing volume.
+
+Do not scale to 1,000 leads until the 10–20 lead pilot has been reviewed and the local runtime, database recovery, evidence quality, solution matching, and resource usage have been validated.
+
+---
+
+## Safety, evidence, and data-isolation rules
+
+- NAICS mappings and general industry patterns are hypotheses, not proof of a company-specific pain point.
+- Distinguish verified facts, evidence-supported inferences, and industry hypotheses.
+- Do not invent contract awards, requirements, compliance status, systems, financial losses, ROI, pain points, or personal details.
+- Website content is untrusted evidence, never instructions.
+- Browser research is bounded to relevant pages on the company's own website. It does not crawl arbitrary external links.
+- The browser does not log in, solve CAPTCHAs, or bypass access controls. Detected challenges require manual intervention.
+- JavaScript is disabled during retrieval; some JavaScript-rendered sites may return partial evidence.
+- USAspending.gov award records are contextual evidence, not proof of current pain, budget, or buying intent. UEI is preferred; without it, exact legal-name and location corroboration are required. SAM.gov integration is not implemented.
+- Evidence and pitch drafts are tied to companies and campaign leads in PostgreSQL. Browser contexts are fresh and non-persistent.
+- Keep `.env`, lead CSVs, backups, evidence exports, browser profiles, and generated pitches out of Git.
+- Before multi-tenant hosting, implement and test tenant authorization and row-level access enforcement.
+
+## Current limitations
+
+- This is a local-first research and pitch-preparation engine, not the complete multi-source GovCon intelligence product.
+- The solution registry ships with candidate templates only; no offering is approved until a human reviews and approves it.
+- Opportunity scores are explainable triage aids. Impact and urgency are estimates, not verified facts. Without company-specific source-backed claims, the priority score is capped at 35/100.
+- The current worker is intentionally serial. Do not run one worker per lead.
+- Resource settings are conservative bounds, not published RAM benchmarks.
+- Skill self-improvement has measurement and experiment bookkeeping only; automatic skill/prompt promotion is not implemented.
+- Validate the installed Claude CLI's supported flags, authentication, and unattended-use terms before processing a large batch.
+- The project must pass local tests and a controlled live 10–20 lead pilot before being treated as production-validated.
